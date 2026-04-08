@@ -1,0 +1,25 @@
+{
+    "host": "127.0.0.1",
+    "port": 60915,
+    "workers": 4,
+    "ssl": {
+        "enabled": false,
+        "certfile": "",
+        "keyfile": "",
+        "ca_certs": ""
+    },
+    "auth": {
+        "enabled": true,
+        "realm": "Short Interest Tracker",
+        "users": {
+            "traderjoe": "pbkdf2:512b253bc4596a8d610073d53d1dbc4d:bc996e83a3b9bd20c6b7369bd9d554e00c801b4d2d13a63f14ef33690a1909e0"
+                "admin": "pbkdf2:512b253bc4596a8d610073d53d1dbc4d:bc996e83a3b9bd20c6b7369bd9d554e00c801b4d2d13a63f14ef33690a1909e0"
+
+        }
+    },
+    "poll_schedule": {
+        "hours": [10, 15],
+        "days": "mon-fri"
+    },
+    "keep_days": 10
+}

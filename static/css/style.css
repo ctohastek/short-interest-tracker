@@ -1,0 +1,567 @@
+/* ── Short Interest Tracker — Styles ── */
+
+:root {
+    --bg: #fafbfc;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --text: #1a202c;
+    --text-muted: #718096;
+    --accent: #3182ce;
+    --accent-light: #ebf8ff;
+    --row-gray: #f7fafc;
+    --row-white: #ffffff;
+    --high-si: #e53e3e;
+    --med-si: #dd6b20;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-lg: 0 10px 25px rgba(0,0,0,0.12), 0 4px 10px rgba(0,0,0,0.08);
+    --radius: 8px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-size: 1.125rem;  /* Increased from 16px to 18px (12.5% larger) */
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+}
+
+/* ── Header ── */
+header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+header h1 {
+    font-size: 1.9rem;  /* Scaled up from 1.75rem */
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.25rem;
+}
+
+.subtitle {
+    color: var(--text-muted);
+    font-size: 1rem;  /* Scaled up from 0.95rem */
+}
+
+/* ── Date Navigation ── */
+.date-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.nav-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.date-buttons {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.date-btn {
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-weight: 500;
+}
+
+.date-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-light);
+}
+
+.date-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+/* ── Meta Row ── */
+.meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding: 0 0.25rem;
+}
+
+.meta-row span {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+#currentDate {
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* ── Table ── */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+thead {
+    background: #f1f5f9;
+}
+
+thead th {
+    padding: 0.7rem 8px;
+    text-align: left;
+    font-size: 0.8rem;  /* Scaled up from 0.75rem */
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+}
+
+tbody tr {
+    transition: background 0.15s ease;
+    cursor: pointer;
+}
+
+tbody tr:hover {
+    background: var(--accent-light) !important;
+}
+
+tbody td {
+    padding: 0.65rem 1rem;
+    font-size: 0.95rem;  /* Scaled up from 0.9rem */
+    border-bottom: 1px solid #edf2f7;
+}
+
+.row-white { background: var(--row-white); }
+.row-gray  { background: var(--row-gray);  }
+
+.rank-col   { width: 3rem; text-align: center; color: var(--text-muted); font-weight: 500; padding: 0 8px; }
+.ticker-col { width: 6rem; padding: 0 8px; }
+.ticker-col strong { color: var(--text); letter-spacing: 0.02em; }
+.pct-col    { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; }
+.dollar-col { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
+.price-col  { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
+.pc-col     { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
+.mcap-col   { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-muted); padding: 0 8px; }
+.trade-plan-col { white-space: nowrap; text-align: center; padding: 0 8px; }
+
+.high-si    { color: var(--high-si); }
+.med-si     { color: var(--med-si); }
+.pc-bearish { color: #e53e3e; }
+.pc-bullish { color: #38a169; }
+
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+
+
+/* ── Quick Lookup ── */
+
+.lookup-section {
+    margin: 1.5rem 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    display: flex;
+    justify-content: flex-end;  /* Right-align entire form */
+}
+
+.lookup-form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.lookup-label {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.lookup-form input {
+    width: 100px;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #94a3b8;  /* Middle gray/blue color */
+    border-radius: 0;  /* Square corners */
+    font-size: 0.9rem;
+    font-family: inherit;
+    transition: border-color 0.2s ease;
+}
+
+.lookup-form input:focus {
+    outline: none;
+    border-color: var(--accent);  /* Blue accent on focus */
+    box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.1);
+}
+
+.lookup-form input:invalid {
+    border-color: #e53e3e;  /* Red for invalid input */
+}
+
+/* Don't show red for empty required fields on page load */
+.lookup-form input:invalid:placeholder-shown {
+    border-color: #94a3b8;
+}
+
+.lookup-btn, .reset-btn {
+    padding: 0.4rem 0.8rem;  /* Smaller button */
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.85rem;  /* Smaller font */
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.lookup-btn:hover, .reset-btn:hover {
+    background: #2c5282;
+}
+
+.reset-btn {
+    background: var(--text-muted);
+}
+
+.reset-btn:hover {
+    background: #4a5568;
+}
+
+.error-message {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #fed7d7;
+    border: 1px solid #fc8181;
+    border-radius: var(--radius);
+    color: #c53030;
+    font-size: 0.85rem;
+    text-align: right;  /* Error messages also right-aligned */
+}
+
+/* ── Footer ── */
+footer {
+    margin-top: 2rem;
+    text-align: center;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+footer p {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+footer a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+footer a:hover {
+    text-decoration: underline;
+}
+
+.footer-note {
+    font-style: italic;
+    font-size: 0.78rem;
+}
+
+/* ── Trade Plan Popup ── */
+.trade-plan-popup {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 1400px;
+    max-width: 98vw;
+    max-height: 90vh;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    z-index: 10000;
+    overflow: hidden;
+}
+
+.trade-plan-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: #f1f5f9;
+    border-bottom: 1px solid var(--border);
+}
+
+.trade-plan-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.close-btn:hover {
+    background: rgba(0,0,0,0.05);
+    color: var(--text);
+}
+
+.trade-plan-content {
+    padding: 0;
+    overflow: hidden;
+    max-height: calc(85vh - 70px);
+}
+
+.trade-plan-layout {
+    display: flex;
+    height: 100%;
+}
+
+.chart-pane {
+    flex: 0 0 70%;  /* Increased to 70% for 1400px popup */
+    background: #f8fafc;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+}
+
+.chart-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    /* Temporary debug background */
+    /* background: rgba(255, 0, 0, 0.1); */
+}
+
+.tradingview-chart {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+    pointer-events: none !important;  /* Force clicks to pass through */
+    position: relative;
+    z-index: 1;
+}
+
+.chart-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    transition: background 0.2s ease;
+    z-index: 2;  /* Make sure overlay is above iframe */
+    pointer-events: none;  /* Let clicks pass through to parent link */
+}
+
+.chart-container:hover .chart-overlay {
+    background: rgba(0, 0, 0, 0.05);
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.chart-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    text-decoration: none;  /* Remove underline from link */
+    color: inherit;         /* Inherit text color */
+    transition: background 0.2s ease;
+}
+
+.chart-container:hover .chart-overlay {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.chart-click-message {
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.chart-container:hover .chart-click-message {
+    opacity: 1;
+}
+
+.analysis-pane {
+    flex: 0 0 30%;  /* Reduced to 30% for 1400px popup */
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.loading-plan {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+.trade-plan-section {
+    margin-bottom: 1.5rem;
+}
+
+.trade-plan-section h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.trade-plan-section p {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.support-resistance {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.support-box, .resistance-box {
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.support-box h5, .resistance-box h5 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.support-box {
+    background: rgba(72, 187, 120, 0.05);
+    border-color: rgba(72, 187, 120, 0.2);
+}
+
+.resistance-box {
+    background: rgba(245, 101, 101, 0.05);
+    border-color: rgba(245, 101, 101, 0.2);
+}
+
+.level-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.level-price {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.trade-plan-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.trade-plan-link:hover {
+    background: var(--accent-light);
+    text-decoration: underline;
+}
+
+.popup-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 9999;
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+    .container { padding: 1rem; }
+    header h1 { font-size: 1.3rem; }
+    thead th, tbody td { padding: 0.5rem 0.5rem; font-size: 0.85rem; }
+    .mcap-col { display: none; }
+    .trade-plan-link { font-size: 0.75rem; }
+    .trade-plan-popup { width: 95vw; max-height: 90vh; }
+    .trade-plan-layout { flex-direction: column; }
+    .chart-pane { flex: 0 0 60%; border-right: none; border-bottom: 1px solid var(--border); }
+    .analysis-pane { flex: 0 0 40%; }
+}

@@ -1,0 +1,24 @@
+{
+    "host": "0.0.0.0",
+    "port": 60914,
+    "workers": 4,
+    "ssl": {
+        "enabled": false,
+        "certfile": "/path/to/fullchain.pem",
+        "keyfile": "/path/to/privkey.pem",
+        "ca_certs": "/path/to/chain.pem"
+    },
+    "auth": {
+        "enabled": true,
+        "realm": "Short Interest Tracker",
+        "users": {
+            "admin": "string",
+            "user2": "string"
+        }
+    },
+    "poll_schedule": {
+        "hours": [10, 15],
+        "days": "mon-fri"
+    },
+    "keep_days": 10
+}

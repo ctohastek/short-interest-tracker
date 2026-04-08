@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Short Interest Tracker — Top 12</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📉 Short Interest Tracker</h1>
+            <p class="subtitle">Top 12 highest short interest from your watchlist</p>
+        </header>
+
+        <nav class="date-nav" id="dateNav">
+            <span class="nav-label">Date:</span>
+            <div class="date-buttons" id="dateButtons">
+                <!-- filled by JS -->
+            </div>
+        </nav>
+
+        <div class="meta-row" id="metaRow">
+            <span id="currentDate">Loading…</span>
+            <span id="lastPoll"></span>
+        </div>
+
+        <table id="siTable">
+            <thead>
+                <tr>
+                    <th class="rank-col">#</th>
+                    <th class="ticker-col">Ticker</th>
+                    <th class="pct-col">Short %</th>
+                    <th class="dollar-col">Short $</th>
+                    <th class="pc-col">P/C Ratio</th>
+                    <th class="price-col">Price</th>
+                    <th class="mcap-col">Mkt Cap</th>
+                    <th class="trade-plan-col">Trade Plan</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td colspan="7" class="loading">Loading data…</td></tr>
+            </tbody>
+        </table>
+
+        <footer>
+            <p>Data sourced from <a href="https://finviz.com" target="_blank">Finviz</a> • Charts via <a href="https://tradingview.com" target="_blank">TradingView</a> widget</p>
+            <p class="footer-note">Hover over any row to preview the 1-day chart • Click "Trade Plan" for technical analysis setup</p>
+        </footer>
+    </div>
+
+
+
+    <!-- Trade Plan Popup -->
+    <div class="trade-plan-popup" id="tradePlanPopup">
+        <div class="trade-plan-header">
+            <h3 id="tradePlanTicker"></h3>
+            <button class="close-btn" id="closeTradePlan">×</button>
+        </div>
+        <div class="trade-plan-content" id="tradePlanContent">
+            <div class="loading-plan">Loading trade plan...</div>
+        </div>
+    </div>
+    <div class="popup-overlay" id="popupOverlay"></div>
+
+    <script>
+        const tooltipEl = document.getElementById('chartTooltip');
+        const tooltipHeader = document.getElementById('chartTooltipHeader');
+        const tooltipBody = document.getElementById('chartTooltipBody');
+        let activeRow = null;
+        let tooltipVisible = false;
+        let currentViewDate = null;
+        let hoverTimer = null;
+
+        // ── Load dates ──
+        async function loadDates() {
+            const resp = await fetch('/api/dates');
+            const dates = await resp.json();
+            const container = document.getElementById('dateButtons');
+            container.innerHTML = '';
+
+            dates.forEach((d, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'date-btn' + (i === 0 ? ' active' : '');
+                btn.textContent = formatDateShort(d);
+                btn.dataset.date = d;
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    loadData(d);
+                });
+                container.appendChild(btn);
+            });
+
+            if (dates.length > 0) {
+                loadData(dates[0]);
+            }
+        }
+
+        // ── Load data for date ──
+        async function loadData(date) {
+            const resp = await fetch(`/api/data/${date}`);
+            const data = await resp.json();
+            renderTable(data, date);
+        }
+
+        // ── Render table ──
+        function renderTable(data, date) {
+            currentViewDate = date;
+            const tbody = document.getElementById('tableBody');
+            document.getElementById('currentDate').textContent = formatDateLong(date);
+
+            if (data.length > 0) {
+                const ts = data[0].poll_ts;
+                const d = new Date(ts * 1000);
+                document.getElementById('lastPoll').textContent =
+                    `Last polled: ${d.toLocaleString()}`;
+            }
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="loading">No data available for this date</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            data.forEach((row, i) => {
+                const tr = document.createElement('tr');
+                tr.className = i % 2 === 0 ? 'row-white' : 'row-gray';
+                tr.dataset.ticker = row.ticker;
+
+                const pctClass = row.short_pct >= 20 ? 'high-si' :
+                                 row.short_pct >= 10 ? 'med-si' : '';
+
+                // Put/Call color: >1.0 = bearish (red tint), <0.7 = bullish (green tint)
+                const pc = row.put_call_ratio;
+                const pcClass = pc > 1.0 ? 'pc-bearish' :
+                                pc > 0 && pc < 0.7 ? 'pc-bullish' : '';
+                const pcDisplay = pc > 0 ? pc.toFixed(2) : '—';
+
+                const tvUrl = `https://www.tradingview.com/chart/?symbol=${row.ticker}&interval=D`;
+
+                tr.innerHTML = `
+                    <td class="rank-col">${i + 1}</td>
+                    <td class="ticker-col"><a href="${tvUrl}" target="_blank" rel="noopener" class="ticker-link"><strong>${row.ticker}</strong> ↗</a></td>
+                    <td class="pct-col ${pctClass}">${row.short_pct.toFixed(2)}%</td>
+                    <td class="dollar-col">${row.short_dollar}</td>
+                    <td class="pc-col ${pcClass}">${pcDisplay}</td>
+                    <td class="price-col">$${row.price.toFixed(2)}</td>
+                    <td class="mcap-col">${row.market_cap || 'N/A'}</td>
+                    <td class="trade-plan-col"><a href="#" class="trade-plan-link" data-ticker="${row.ticker}" data-date="${date}">Trade Plan</a></td>
+                `;
+
+                tr.addEventListener('click', (e) => {
+                    if (e.target.closest('a')) return;
+                    window.open(tvUrl, '_blank');
+                });
+
+                tr.addEventListener('mouseenter', (e) => {
+                    clearTimeout(hoverTimer);
+                    hoverTimer = setTimeout(() => showTooltip(e, row.ticker), 300); // 300ms delay
+                });
+                tr.addEventListener('mousemove', (e) => moveTooltip(e));
+                tr.addEventListener('mouseleave', () => {
+                    clearTimeout(hoverTimer);
+                    hideTooltip();
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ── Chart tooltip ──
+        function showTooltip(e, ticker) {
+            console.log('showTooltip called for', ticker);
+            activeRow = ticker;
+            tooltipVisible = true;
+            const date = currentViewDate;
+            tooltipHeader.textContent = `${ticker} — 1D Chart (${date})`;
+            console.log('Tooltip element:', tooltipEl);
+            console.log('Tooltip display set to block');
+
+            const imgUrl = `/api/chart/${ticker}/${date}`;
+            const img = new Image();
+            img.onload = function() {
+                if (activeRow !== ticker) return;
+                tooltipBody.innerHTML = `<img src="${imgUrl}" alt="${ticker} chart" style="width:360px;height:240px;display:block;">`;
+            };
+            img.onerror = function() {
+                if (activeRow !== ticker) return;
+                tooltipBody.innerHTML = `
+                    <iframe
+                        src="https://s.tradingview.com/widgetembed/?symbol=${ticker}&interval=D&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en"
+                        width="360"
+                        height="240"
+                        style="width:360px;height:240px;border:none;"
+                        scrolling="no" allowtransparency="true" frameborder="0">
+                    </iframe>
+                `;
+            };
+            img.src = imgUrl;
+
+            tooltipBody.innerHTML = `<div style="width:360px;height:240px;display:flex;align-items:center;justify-content:center;color:#718096;font-size:0.85rem;">Loading chart…</div>`;
+            tooltipEl.style.display = 'block';
+            moveTooltip(e);
+        }
+
+        function moveTooltip(e) {
+            if (!tooltipVisible) return;
+            console.log('Moving tooltip, cursor at:', e.clientX, e.clientY);
+            
+            // Try positioning relative to the row instead of cursor
+            const row = e.target.closest('tr');
+            if (row) {
+                const rect = row.getBoundingClientRect();
+                // Position tooltip to the left of the row, aligned with top
+                const x = rect.left - 380;  // Left of row, minus tooltip width
+                const y = rect.top - 20;    // Above the row
+                
+                const maxX = window.innerWidth - 380;
+                const maxY = window.innerHeight - 280;
+                const finalX = Math.max(10, Math.min(x, maxX));
+                const finalY = Math.max(10, Math.min(y, maxY));
+                
+                console.log('Row position:', rect.left, rect.top);
+                console.log('Setting tooltip position (row-based):', finalX, finalY);
+                tooltipEl.style.left = finalX + 'px';
+                tooltipEl.style.top = finalY + 'px';
+            } else {
+                // Fallback to cursor-based positioning
+                const x = e.clientX - 150;  // Even more left
+                const y = e.clientY - 320;  // Much higher (more "north")
+                const maxX = window.innerWidth - 380;
+                const maxY = window.innerHeight - 280;
+                const finalX = Math.min(x, maxX);
+                const finalY = Math.max(10, Math.min(y, maxY));
+                console.log('Setting tooltip position (cursor-based):', finalX, finalY);
+                tooltipEl.style.left = finalX + 'px';
+                tooltipEl.style.top = finalY + 'px';
+            }
+        }
+
+        function hideTooltip() {
+            tooltipVisible = false;
+            activeRow = null;
+            tooltipEl.style.display = 'none';
+            tooltipBody.innerHTML = '';
+        }
+
+        // ── Date formatting ──
+        function formatDateShort(d) {
+            const parts = d.split('-');
+            return `${parts[1]}/${parts[2]}`;
+        }
+
+        function formatDateLong(d) {
+            const dt = new Date(d + 'T12:00:00');
+            return dt.toLocaleDateString('en-US', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+        }
+
+        // ── Trade Plan ──
+        const tradePlanPopup = document.getElementById('tradePlanPopup');
+        const tradePlanTicker = document.getElementById('tradePlanTicker');
+        const tradePlanContent = document.getElementById('tradePlanContent');
+        const closeTradePlan = document.getElementById('closeTradePlan');
+        const popupOverlay = document.getElementById('popupOverlay');
+
+        // Add event listeners for trade plan links
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('trade-plan-link')) {
+                e.preventDefault();
+                const ticker = e.target.dataset.ticker;
+                const date = e.target.dataset.date;
+                showTradePlan(ticker, date);
+            }
+        });
+
+        closeTradePlan.addEventListener('click', hideTradePlan);
+        popupOverlay.addEventListener('click', hideTradePlan);
+
+        function showTradePlan(ticker, date) {
+            tradePlanTicker.textContent = `${ticker} — Trade Plan`;
+            tradePlanContent.innerHTML = '<div class="loading-plan">Loading trade plan...</div>';
+            tradePlanPopup.style.display = 'block';
+            popupOverlay.style.display = 'block';
+            
+            // Fetch trade plan from API
+            fetch(`/api/trade-plan/${ticker}/${date}`)
+                .then(resp => resp.json())
+                .then(data => {
+                    renderTradePlan(data);
+                })
+                .catch(err => {
+                    tradePlanContent.innerHTML = `<div class="error">Failed to load trade plan: ${err.message}</div>`;
+                });
+        }
+
+        function hideTradePlan() {
+            tradePlanPopup.style.display = 'none';
+            popupOverlay.style.display = 'none';
+        }
+
+        function renderTradePlan(data) {
+            const { ticker, date, analysis } = data;
+            
+            let html = `
+                <div class="trade-plan-section">
+                    <h4>Overview</h4>
+                    <p>${analysis.overview || 'No overview available.'}</p>
+                </div>
+            `;
+            
+            if (analysis.support_levels && analysis.support_levels.length > 0) {
+                html += `
+                <div class="trade-plan-section">
+                    <h4>Support & Resistance</h4>
+                    <div class="support-resistance">
+                        <div class="support-box">
+                            <h5>Support Levels</h5>
+                            ${analysis.support_levels.map(level => `
+                                <div class="level-item">
+                                    <span>${level.name}</span>
+                                    <span class="level-price">$${level.price.toFixed(2)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="resistance-box">
+                            <h5>Resistance Levels</h5>
+                            ${analysis.resistance_levels.map(level => `
+                                <div class="level-item">
+                                    <span>${level.name}</span>
+                                    <span class="level-price">$${level.price.toFixed(2)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+                `;
+            }
+            
+            html += `
+                <div class="trade-plan-section">
+                    <h4>Trade Setup</h4>
+                    <p><strong>Ideal Entry:</strong> $${analysis.ideal_entry?.toFixed(2) || 'N/A'}</p>
+                    <p><strong>Stop Loss:</strong> $${analysis.stop_loss?.toFixed(2) || 'N/A'} (${analysis.stop_loss_pct?.toFixed(1) || 'N/A'}% below entry)</p>
+                    <p><strong>Target:</strong> $${analysis.target?.toFixed(2) || 'N/A'} (${analysis.target_pct?.toFixed(1) || 'N/A'}% above entry)</p>
+                </div>
+                <div class="trade-plan-section">
+                    <h4>Notes</h4>
+                    <p>${analysis.notes || 'Monitor price action around key levels. Adjust stop loss as price moves in your favor.'}</p>
+                </div>
+            `;
+            
+            tradePlanContent.innerHTML = html;
+        }
+
+        // ── Init ──
+        loadDates();
+    </script>
+</body>
+</html>

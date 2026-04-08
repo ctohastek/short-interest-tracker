@@ -1,0 +1,18 @@
+
+[Unit]
+Description=Short Interest Tracker — Top 12 Dashboard (gunicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=username
+WorkingDirectory=/path/to/short-interest-tracker
+ExecStart=/usr/bin/gunicorn --config gunicorn_conf.py app:app
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
+
