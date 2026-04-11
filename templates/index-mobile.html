@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260410_2327">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260411_0009">
 </head>
 <body>
     <div class="container">
@@ -260,10 +260,16 @@
         function renderTradePlan(data) {
             const { ticker, date, analysis } = data;
             
+            // Make SHORT_PCT_VALUE bold in the overview
+            let overview = analysis.overview || 'No overview available.';
+            // Find and bold the percentage value (looks for patterns like "shows 15.25% short interest")
+            overview = overview.replace(/(shows\s+)(\d+\.?\d*%)(\s+short interest)/i, 
+                '$1<strong>$2</strong>$3');
+            
             let html = `
                 <div class="trade-plan-section">
                     <h4>Overview</h4>
-                    <p>${analysis.overview || 'No overview available.'}</p>
+                    <p>${overview}</p>
                 </div>
             `;
             
