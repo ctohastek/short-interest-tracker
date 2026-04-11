@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260409_2335">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260410_2327">
 </head>
 <body>
     <div class="container">
@@ -88,6 +88,10 @@
                 <div class="analysis-pane" id="analysisPane">
                     <div class="loading-plan">Loading trade plan...</div>
                 </div>
+                <!-- Mobile-only TradingView link (hidden on desktop) -->
+                <div class="mobile-tradingview-link" id="mobileTradingViewLink" style="display: none;">
+                    <a id="mobileChartLink" target="_blank" rel="noopener noreferrer">Click for Tradingview Chart</a>
+                </div>
             </div>
         </div>
     </div>
@@ -162,9 +166,12 @@
                                 pc > 0 && pc < 0.7 ? 'pc-bullish' : '';
                 const pcDisplay = pc > 0 ? pc.toFixed(2) : '—';
 
-                // IV color: green if under 50%, red if over 50%
-                const iv = row.implied_volatility || 0;
-                const ivClass = iv > 50 ? 'iv-high' : 'iv-low';
+                // IV color: green if under 25%, red if over 25%, bold if over 100%
+                const iv = parseFloat(row.implied_volatility) || 0;
+                console.log(`IV debug: ${row.ticker} = ${row.implied_volatility} -> parsed: ${iv}, type: ${typeof iv}`);
+                let ivClass = iv > 25 ? 'iv-high' : 'iv-low';
+                if (iv > 100) ivClass = 'iv-extreme';
+                console.log(`IV class for ${row.ticker}: ${ivClass}`);
                 const ivDisplay = iv > 0 ? iv.toFixed(2) + '%' : '—';
 
                 tr.innerHTML = `
@@ -216,29 +223,44 @@
             currentTradePlanTicker = ticker;
             tradePlanTicker.textContent = `${ticker} — Trade Plan`;
             
-            // Set up TradingView chart
-            const chartUrl = `https://s.tradingview.com/widgetembed/?symbol=${ticker}&interval=D&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en`;
-            tradePlanChart.src = chartUrl;
-            tradePlanChart.dataset.ticker = ticker;
+            // Check if we're on mobile
+            const isMobile = window.innerWidth <= 640;
             
-            // Set up chart link - try multiple selectors
-            let chartLink = tradePlanPopup.querySelector('#chartLink');
-            if (!chartLink) {
-                // Try by class if ID doesn't work
-                chartLink = tradePlanPopup.querySelector('.chart-container');
-            }
-            if (!chartLink) {
-                // Try ticker-link class as fallback
-                chartLink = tradePlanPopup.querySelector('.ticker-link');
-            }
-            
-            if (chartLink) {
-                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=D`;
-                chartLink.href = tvUrl;
-                chartLink.title = `Open ${ticker} chart in TradingView`;
-                console.log('Chart link set for:', ticker);
+            if (!isMobile) {
+                // Desktop: show chart
+                const chartUrl = `https://s.tradingview.com/widgetembed/?symbol=${ticker}&interval=D&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en`;
+                tradePlanChart.src = chartUrl;
+                tradePlanChart.dataset.ticker = ticker;
+                
+                // Set up chart link
+                let chartLink = tradePlanPopup.querySelector('#chartLink');
+                if (!chartLink) {
+                    chartLink = tradePlanPopup.querySelector('.chart-container');
+                }
+                if (!chartLink) {
+                    chartLink = tradePlanPopup.querySelector('.ticker-link');
+                }
+                
+                if (chartLink) {
+                    const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=D`;
+                    chartLink.href = tvUrl;
+                    chartLink.title = `Open ${ticker} chart in TradingView`;
+                }
+                
+                // Show chart pane, hide mobile link
+                document.getElementById('chartPane').style.display = 'flex';
+                document.getElementById('mobileTradingViewLink').style.display = 'none';
             } else {
-                console.warn('Could not find chart link element in popup');
+                // Mobile: hide chart, show mobile link
+                document.getElementById('chartPane').style.display = 'none';
+                const mobileLink = document.getElementById('mobileTradingViewLink');
+                mobileLink.style.display = 'block';
+                
+                const mobileChartLink = document.getElementById('mobileChartLink');
+                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=D`;
+                mobileChartLink.href = tvUrl;
+                mobileChartLink.textContent = `Click for Tradingview Chart - ${ticker}`;
+                mobileChartLink.title = `Open ${ticker} chart in TradingView`;
             }
             
             // Show loading state
@@ -279,10 +301,16 @@
         function renderTradePlan(data) {
             const { ticker, date, analysis } = data;
             
+            // Make SHORT_PCT_VALUE bold in the overview
+            let overview = analysis.overview || 'No overview available.';
+            // Find and bold the percentage value (looks for patterns like "shows 15.25% short interest")
+            overview = overview.replace(/(shows\s+)(\d+\.?\d*%)(\s+short interest)/i, 
+                '$1<strong>$2</strong>$3');
+            
             let html = `
                 <div class="trade-plan-section">
                     <h4>Overview</h4>
-                    <p>${analysis.overview || 'No overview available.'}</p>
+                    <p>${overview}</p>
                 </div>
             `;
             
@@ -437,9 +465,10 @@
                             pc > 0 && pc < 0.7 ? 'pc-bullish' : '';
             const pcDisplay = pc > 0 ? pc.toFixed(2) : '—';
             
-            // IV color: green if under 50%, red if over 50%
-            const iv = row.implied_volatility || 0;
-            const ivClass = iv > 50 ? 'iv-high' : 'iv-low';
+            // IV color: green if under 25%, red if over 25%, bold if over 100%
+            const iv = parseFloat(row.implied_volatility) || 0;
+            let ivClass = iv > 25 ? 'iv-high' : 'iv-low';
+            if (iv > 100) ivClass = 'iv-extreme';
             const ivDisplay = iv > 0 ? iv.toFixed(2) + '%' : '—';
             
             tr.innerHTML = `

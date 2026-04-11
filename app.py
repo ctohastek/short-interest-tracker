@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
 from functools import wraps
 from flask import Flask, render_template, jsonify, send_from_directory, request, Response
+import re
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from selenium import webdriver
@@ -445,6 +446,8 @@ def generate_trade_analysis(ticker, current_price, short_pct, put_call_ratio):
 # ── Flask App ───────────────────────────────────────────────────────────
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+app.config['TEMPLATES_AUTO_RELOAD'] = True  # Auto-reload templates
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching of static files
 
 # ── HTTP Basic Auth ─────────────────────────────────────────────────────
 AUTH_CFG = CONFIG.get("auth", {})
@@ -504,8 +507,35 @@ def before_request_auth():
         )
 
 
+def is_mobile():
+    """Detect if request is from mobile device."""
+    user_agent = request.headers.get('User-Agent', '').lower()
+    mobile_indicators = [
+        'mobile', 'android', 'iphone', 'ipad', 'ipod', 'blackberry',
+        'windows phone', 'webos', 'opera mini', 'iemobile'
+    ]
+    
+    # Check user agent
+    for indicator in mobile_indicators:
+        if indicator in user_agent:
+            return True
+    
+    # Check viewport width via cookie or header
+    viewport_width = request.headers.get('X-Viewport-Width')
+    if viewport_width:
+        try:
+            return int(viewport_width) < 768
+        except ValueError:
+            pass
+    
+    return False
+
+
 @app.route("/")
 def index():
+    """Serve mobile or desktop version based on detection."""
+    if is_mobile():
+        return render_template("index-mobile.html")
     return render_template("index.html")
 
 
@@ -538,15 +568,16 @@ def api_dates():
 
 @app.route("/api/data/<date>")
 def api_data(date):
-    """Return top 12 short interest records for a given date."""
+    """Return top short interest records for a given date."""
+    limit = 4 if is_mobile() else 12
     conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute("""
+    rows = conn.execute(f"""
         SELECT ticker, short_pct, short_dollar, market_cap, price, poll_ts,
                put_call_ratio, implied_volatility
         FROM short_interest
         WHERE poll_date = ?
         ORDER BY short_pct DESC
-        LIMIT 12
+        LIMIT {limit}
     """, (date,)).fetchall()
     conn.close()
 
@@ -576,13 +607,14 @@ def api_latest():
         conn.close()
         return jsonify([])
     date = row[0]
-    rows = conn.execute("""
+    limit = 4 if is_mobile() else 12
+    rows = conn.execute(f"""
         SELECT ticker, short_pct, short_dollar, market_cap, price, poll_ts,
                put_call_ratio, implied_volatility
         FROM short_interest
         WHERE poll_date = ?
         ORDER BY short_pct DESC
-        LIMIT 12
+        LIMIT {limit}
     """, (date,)).fetchall()
     conn.close()
 

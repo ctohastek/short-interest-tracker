@@ -1,4 +1,5 @@
 /* ── Short Interest Tracker — Styles ── */
+/* v=20260410_0250 */
 
 :root {
     --bg: #fafbfc;
@@ -41,12 +42,12 @@ body {
 
 /* ── Header ── */
 header {
-    text-align: center;
+    text-align: left;  /* Changed from center to left */
     margin-bottom: 1.5rem;
 }
 
 header h1 {
-    font-size: 1.9rem;  /* Scaled up from 1.75rem */
+    font-size: 1.5rem;  /* Reduced from 1.9rem (about 2 sizes smaller) */
     font-weight: 700;
     letter-spacing: -0.02em;
     margin-bottom: 0.25rem;
@@ -54,7 +55,8 @@ header h1 {
 
 .subtitle {
     color: var(--text-muted);
-    font-size: 1rem;  /* Scaled up from 0.95rem */
+    font-size: 0.9rem;  /* Slightly smaller to match */
+    text-align: left;  /* Added left alignment */
 }
 
 /* ── Date Navigation ── */
@@ -189,8 +191,9 @@ tbody td {
 .med-si     { color: var(--med-si); }
 .pc-bearish { color: #e53e3e; }
 .pc-bullish { color: #38a169; }
-.iv-high    { color: #e53e3e; }  /* red for IV > 50% */
-.iv-low     { color: #38a169; }  /* green for IV <= 50% */
+td.iv-high    { color: #e53e3e !important; }  /* red for IV > 25% */
+td.iv-low     { color: #38a169 !important; }  /* green for IV <= 25% */
+td.iv-extreme { color: #e53e3e !important; font-weight: 700 !important; }  /* red + bold for IV > 100% */
 
 .loading {
     text-align: center;
@@ -410,6 +413,16 @@ footer a:hover {
     z-index: 1;
 }
 
+/* Make the TradingView chart itself 60% of its original size on desktop */
+@media (min-width: 641px) {
+    .tradingview-chart {
+        transform: scale(0.6);
+        transform-origin: top left;
+        width: 166.67%;  /* Compensate for scaling */
+        height: 166.67%;
+    }
+}
+
 .chart-overlay {
     position: absolute;
     top: 0;
@@ -575,4 +588,28 @@ footer a:hover {
     .trade-plan-layout { flex-direction: column; }
     .chart-pane { flex: 0 0 60%; border-right: none; border-bottom: 1px solid var(--border); }
     .analysis-pane { flex: 0 0 40%; }
+}
+
+/* Mobile-only trading view link */
+.mobile-tradingview-link {
+    text-align: center;
+    padding: 1rem;
+    border-top: 1px solid var(--border);
+    background: var(--accent-light);
+    margin-top: 1rem;
+}
+
+.mobile-tradingview-link a {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: var(--accent);
+    color: white;
+    text-decoration: none;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.mobile-tradingview-link a:hover {
+    background: #2c5282;
 }
