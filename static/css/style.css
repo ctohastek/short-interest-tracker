@@ -149,6 +149,13 @@ thead th {
     white-space: nowrap;
 }
 
+/* Center align P/C Ratio and IV headers */
+thead th.pc-col,
+thead th.iv-col {
+    text-align: center;
+    font-weight: 600; /* Ensure bold */
+}
+
 tbody tr {
     transition: background 0.15s ease;
     cursor: pointer;
@@ -160,7 +167,7 @@ tbody tr:hover {
 
 tbody td {
     padding: 0.65rem 1rem;
-    font-size: 0.95rem;  /* Scaled up from 0.9rem */
+    font-size: 0.8rem;  /* Uniform size matching Trade Plan */
     border-bottom: 1px solid #edf2f7;
 }
 
@@ -173,7 +180,8 @@ tbody td {
 .pct-col    { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; }
 .dollar-col { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
 .price-col  { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
-.pc-col     { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
+.pc-col     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
+.iv-col     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
 .mcap-col   { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-muted); padding: 0 8px; }
 .trade-plan-col { white-space: nowrap; text-align: center; padding: 0 8px; }
 
@@ -181,6 +189,8 @@ tbody td {
 .med-si     { color: var(--med-si); }
 .pc-bearish { color: #e53e3e; }
 .pc-bullish { color: #38a169; }
+.iv-high    { color: #e53e3e; }  /* red for IV > 50% */
+.iv-low     { color: #38a169; }  /* green for IV <= 50% */
 
 .loading {
     text-align: center;
@@ -313,7 +323,8 @@ footer a:hover {
     transform: translate(-50%, -50%);
     width: 1400px;
     max-width: 98vw;
-    max-height: 90vh;
+    height: 92vh;  /* Increased to 92vh */
+    max-height: 92vh;
     background: var(--surface);
     border-radius: var(--radius);
     box-shadow: var(--shadow-lg);
@@ -325,7 +336,7 @@ footer a:hover {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 1.5rem;
+    padding: 0.5rem 1.5rem;  /* Reduced from 1rem */
     background: #f1f5f9;
     border-bottom: 1px solid var(--border);
 }
@@ -360,7 +371,7 @@ footer a:hover {
 .trade-plan-content {
     padding: 0;
     overflow: hidden;
-    max-height: calc(85vh - 70px);
+    max-height: calc(92vh - 50px);  /* Adjusted for 92vh popup */
 }
 
 .trade-plan-layout {
@@ -560,7 +571,7 @@ footer a:hover {
     thead th, tbody td { padding: 0.5rem 0.5rem; font-size: 0.85rem; }
     .mcap-col { display: none; }
     .trade-plan-link { font-size: 0.75rem; }
-    .trade-plan-popup { width: 95vw; max-height: 90vh; }
+    .trade-plan-popup { width: 95vw; height: 92vh; max-height: 92vh; }
     .trade-plan-layout { flex-direction: column; }
     .chart-pane { flex: 0 0 60%; border-right: none; border-bottom: 1px solid var(--border); }
     .analysis-pane { flex: 0 0 40%; }

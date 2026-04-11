@@ -88,6 +88,14 @@ def init_db():
     except sqlite3.OperationalError:
         log.info("Migrating DB: adding put_call_ratio column...")
         conn.execute("ALTER TABLE short_interest ADD COLUMN put_call_ratio REAL")
+    
+    # Migrate: add implied_volatility column if missing
+    try:
+        conn.execute("SELECT implied_volatility FROM short_interest LIMIT 1")
+    except sqlite3.OperationalError:
+        log.info("Migrating DB: adding implied_volatility column...")
+        conn.execute("ALTER TABLE short_interest ADD COLUMN implied_volatility REAL")
+    
     conn.commit()
     conn.close()
 
@@ -238,7 +246,7 @@ def fetch_ticker_data(ticker):
         # Collect label→value pairs from the snapshot table
         data = {}
         FIELDS = ("Short Float", "Short Interest", "Shs Float",
-                  "Market Cap", "Price", "Shs Outstand", "P/C")
+                  "Market Cap", "Price", "Shs Outstand", "P/C", "Volatility")
         table = soup.find("table", class_="snapshot-table2")
         if not table:
             tables = soup.find_all("table")
@@ -260,6 +268,33 @@ def fetch_ticker_data(ticker):
         price = parse_price(data.get("Price", ""))
         short_dollar = calc_short_dollar(short_pct, market_cap, price)
         put_call = parse_float(data.get("P/C", ""))
+        
+        # Get Implied Volatility from yfinance
+        implied_volatility = 0.0
+        try:
+            import yfinance as yf
+            stock = yf.Ticker(ticker)
+            
+            # Get options chain for nearest expiration
+            options = stock.options
+            if options:
+                expiry = options[0]  # Nearest expiration
+                opt_chain = stock.option_chain(expiry)
+                
+                if not opt_chain.calls.empty and price > 0:
+                    # Find ATM call (closest to current price)
+                    opt_chain.calls['strike_diff'] = abs(opt_chain.calls['strike'] - price)
+                    nearest = opt_chain.calls.nsmallest(1, 'strike_diff')
+                    if not nearest.empty:
+                        iv = nearest.iloc[0]['impliedVolatility']
+                        if iv and iv > 0:
+                            implied_volatility = iv * 100  # Convert to percentage
+            
+            # Small delay to avoid rate limiting
+            import time
+            time.sleep(0.2)
+        except Exception as e:
+            log.warning(f"Failed to fetch IV for {ticker}: {e}")
 
         return {
             "ticker": ticker,
@@ -268,6 +303,7 @@ def fetch_ticker_data(ticker):
             "market_cap": market_cap,
             "price": price,
             "put_call_ratio": put_call,
+            "implied_volatility": implied_volatility,
         }
 
     except Exception as e:
@@ -304,12 +340,12 @@ def poll_all_tickers():
             conn.execute("""
                 INSERT OR REPLACE INTO short_interest
                 (ticker, short_pct, short_dollar, market_cap, price, put_call_ratio,
-                 poll_date, poll_ts)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 implied_volatility, poll_date, poll_ts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 row["ticker"], row["short_pct"], row["short_dollar"],
                 row["market_cap"], row["price"], row["put_call_ratio"],
-                today, ts,
+                row["implied_volatility"], today, ts,
             ))
         except Exception as e:
             log.error(f"DB insert error for {row['ticker']}: {e}")
@@ -506,7 +542,7 @@ def api_data(date):
     conn = sqlite3.connect(DB_PATH)
     rows = conn.execute("""
         SELECT ticker, short_pct, short_dollar, market_cap, price, poll_ts,
-               put_call_ratio
+               put_call_ratio, implied_volatility
         FROM short_interest
         WHERE poll_date = ?
         ORDER BY short_pct DESC
@@ -524,6 +560,7 @@ def api_data(date):
             "price": r[4],
             "poll_ts": r[5],
             "put_call_ratio": r[6] or 0.0,
+            "implied_volatility": r[7] or 0.0,
         })
     return jsonify(data)
 
@@ -541,7 +578,7 @@ def api_latest():
     date = row[0]
     rows = conn.execute("""
         SELECT ticker, short_pct, short_dollar, market_cap, price, poll_ts,
-               put_call_ratio
+               put_call_ratio, implied_volatility
         FROM short_interest
         WHERE poll_date = ?
         ORDER BY short_pct DESC
@@ -559,6 +596,7 @@ def api_latest():
             "price": r[4],
             "poll_ts": r[5],
             "put_call_ratio": r[6] or 0.0,
+            "implied_volatility": r[7] or 0.0,
         })
     return jsonify({"date": date, "data": data})
 
@@ -613,6 +651,26 @@ def api_trade_plan(ticker, date):
         "short_pct": short_pct,
         "put_call_ratio": put_call_ratio,
         "analysis": analysis
+    })
+
+
+@app.route("/api/custom-ticker/<ticker>/<date>")
+def api_custom_ticker(ticker, date):
+    """Fetch data for a custom ticker (not in watchlist)."""
+    # Fetch data using same function as regular polling
+    data = fetch_ticker_data(ticker)
+    if not data:
+        return jsonify({"error": f"No data found for {ticker}"}), 404
+    
+    # Return in same format as regular data
+    return jsonify({
+        "ticker": data["ticker"],
+        "short_pct": data["short_pct"],
+        "short_dollar": data["short_dollar"],
+        "market_cap": data["market_cap"],
+        "price": data["price"],
+        "put_call_ratio": data["put_call_ratio"],
+        "implied_volatility": data["implied_volatility"]
     })
 
 

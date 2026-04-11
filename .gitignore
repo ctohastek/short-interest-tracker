@@ -17,5 +17,5 @@ build/
 *.swo
 *~
 .DS_Store
-dispatcher.db
+short_interest.db
 .superpowers

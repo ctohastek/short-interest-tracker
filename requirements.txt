@@ -1,0 +1,27 @@
+# Core web framework
+Flask>=2.3.0
+
+# Scheduler for polling
+APScheduler>=3.10.0
+
+# Web scraping
+beautifulsoup4>=4.12.0
+requests>=2.31.0
+selenium>=4.15.0
+
+# Financial data
+yfinance>=0.2.0
+
+# Production server (system package or pip)
+# gunicorn>=21.0.0  # Usually installed via system package
+
+# System dependencies (not pip installable):
+# - geckodriver (for Selenium/Firefox chart capture)
+# - Firefox browser (headless)
+# - Python 3.9+ (for zoneinfo)
+# - sqlite3 (standard library)
+
+# Optional for development:
+# pytest>=7.0.0
+# black>=23.0.0
+# flake8>=6.0.0
