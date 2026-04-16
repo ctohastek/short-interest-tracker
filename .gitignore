@@ -17,6 +17,8 @@ build/
 *.swo
 *~
 .DS_Store
-short_interest.db
+data/short_interest.db
+data/gunicorn*log
 .superpowers
 data/*log
+tracker_config.json
