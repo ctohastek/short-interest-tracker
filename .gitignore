@@ -19,3 +19,4 @@ build/
 .DS_Store
 short_interest.db
 .superpowers
+data/*log
