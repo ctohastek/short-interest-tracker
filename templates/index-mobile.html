@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260411_0009">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260416_0238">
 </head>
 <body>
     <div class="container">
@@ -47,7 +47,7 @@
         <!-- Quick Lookup Form (minimal) -->
         <div class="lookup-section">
             <form id="tickerLookupForm" class="lookup-form">
-                <label for="customTicker" class="lookup-label">Your ticker:</label>
+                <label for="customTicker" class="lookup-label">Ticker:</label>
                 <input 
                     type="text" 
                     id="customTicker" 
@@ -61,6 +61,60 @@
                 <button type="button" id="resetLookup" class="reset-btn" style="display: none;">Back</button>
             </form>
             <div id="lookupError" class="error-message" style="display: none;"></div>
+        </div>
+        
+        <!-- Gap Gainers Table -->
+        <div class="gap-section">
+            <div class="gap-header-row">
+                <h2 class="gap-header"><span class="gap-arrow up-arrow">▲</span> Top 5 Gap Gainers</h2>
+            </div>
+            <div class="gap-subtitle">
+                <span>Pre-Market Gainers polled from 10B to 200B market cap tickers</span>
+                <div class="gap-poll-time" id="gapGainersPollTime"></div>
+            </div>
+            <table class="gap-table" id="gapGainersTable">
+                <thead>
+                    <tr>
+                        <th class="rank-col"></th>
+                        <th class="ticker-col">Ticker</th>
+                        <th class="pct-col">%CHANGE</th>
+                        <th class="price-col">Price</th>
+                        <th class="iv-col">IV</th>
+                        <th class="prob-col">TREND REV</th>
+                        <th class="trade-plan-col">Gap Plan</th>
+                    </tr>
+                </thead>
+                <tbody id="gapGainersBody">
+                    <tr><td colspan="7" class="loading">Loading gap data…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Gap Losers Table -->
+        <div class="gap-section">
+            <div class="gap-header-row">
+                <h2 class="gap-header"><span class="gap-arrow down-arrow">▼</span> Top 5 Gap Losers</h2>
+            </div>
+            <div class="gap-subtitle">
+                <span>Pre-Market Losers polled from 10B to 200B market cap tickers</span>
+                <div class="gap-poll-time" id="gapLosersPollTime"></div>
+            </div>
+            <table class="gap-table" id="gapLosersTable">
+                <thead>
+                    <tr>
+                        <th class="rank-col"></th>
+                        <th class="ticker-col">Ticker</th>
+                        <th class="pct-col">%CHANGE</th>
+                        <th class="price-col">Price</th>
+                        <th class="iv-col">IV</th>
+                        <th class="prob-col">TREND REV</th>
+                        <th class="trade-plan-col">Gap Plan</th>
+                    </tr>
+                </thead>
+                <tbody id="gapLosersBody">
+                    <tr><td colspan="7" class="loading">Loading gap data…</td></tr>
+                </tbody>
+            </table>
         </div>
 
         <footer>
@@ -122,6 +176,206 @@
             const resp = await fetch(`/api/data/${date}`);
             const data = await resp.json();
             renderTable(data, date);
+            
+            // Also load gap data
+            await loadGapData(date);
+        }
+        
+        // ── Load gap data ──
+        async function loadGapData(date) {
+            try {
+                const resp = await fetch(`/api/gap-data/${date}`);
+                const gapData = await resp.json();
+                renderGapTables(gapData);
+            } catch (error) {
+                console.error("Error loading gap data:", error);
+                // Show empty state
+                document.getElementById("gapGainersBody").innerHTML = 
+                    '<tr><td colspan="6" class="loading">Error loading gap data</td></tr>';
+                document.getElementById("gapLosersBody").innerHTML = 
+                    '<tr><td colspan="6" class="loading">Error loading gap data</td></tr>';
+            }
+        }
+        
+        // ── Render gap tables ──
+        function renderGapTables(gapData) {
+            // Render gap gainers
+            const gainersBody = document.getElementById("gapGainersBody");
+            if (gapData.gainers.length === 0) {
+                gainersBody.innerHTML = '<tr><td colspan="7" class="loading">No gap gainers data</td></tr>';
+            } else {
+                gainersBody.innerHTML = '';
+                gapData.gainers.forEach(item => {
+                    const row = document.createElement('tr');
+                    
+                    // Format percentage with color
+                    const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
+                    const pctDisplay = item.pct_change >= 0 ? 
+                        `+${item.pct_change.toFixed(2)}%` : 
+                        `${item.pct_change.toFixed(2)}%`;
+                    
+                    // Format IV with color
+                    let ivClass = 'iv-neutral';
+                    let ivDisplay = item.implied_volatility.toFixed(1) + '%';
+                    if (item.implied_volatility > 100) {
+                        ivClass = 'iv-high-bold';
+                    } else if (item.implied_volatility > 25) {
+                        ivClass = 'iv-high';
+                    } else {
+                        ivClass = 'iv-low';
+                    }
+                    
+                    // Calculate probability of trend reversal for gainers
+                    const gapMagnitude = Math.abs(item.pct_change);
+                    const ivFactor = Math.min(item.implied_volatility / 100, 1.5);
+                    let probReversal = Math.min(gapMagnitude * 2 + ivFactor * 10, 95);
+                    probReversal = Math.max(probReversal, 5);
+                    const probDisplay = Math.round(probReversal) + '%';
+                    
+                    row.innerHTML = `
+                        <td class="rank-col">${item.rank}</td>
+                        <td class="ticker-col"><strong>${item.ticker}</strong></td>
+                        <td class="pct-col ${pctClass}">${pctDisplay}</td>
+                        <td class="price-col">$${item.price.toFixed(2)}</td>
+                        <td class="iv-col ${ivClass}">${ivDisplay}</td>
+                        <td class="prob-col">${probDisplay}</td>
+                        <td class="trade-plan-col">
+                            <a href="#" class="gap-trade-plan-link" data-ticker="${item.ticker}">Plan</a>
+                        </td>
+                    `;
+                    gainersBody.appendChild(row);
+                });
+            }
+            
+            // Render gap losers
+            const losersBody = document.getElementById("gapLosersBody");
+            if (gapData.losers.length === 0) {
+                losersBody.innerHTML = '<tr><td colspan="7" class="loading">No gap losers data</td></tr>';
+            } else {
+                losersBody.innerHTML = '';
+                gapData.losers.forEach(item => {
+                    const row = document.createElement('tr');
+                    
+                    // Format percentage with color
+                    const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
+                    const pctDisplay = item.pct_change >= 0 ? 
+                        `+${item.pct_change.toFixed(2)}%` : 
+                        `${item.pct_change.toFixed(2)}%`;
+                    
+                    // Format IV with color
+                    let ivClass = 'iv-neutral';
+                    let ivDisplay = item.implied_volatility.toFixed(1) + '%';
+                    if (item.implied_volatility > 100) {
+                        ivClass = 'iv-high-bold';
+                    } else if (item.implied_volatility > 25) {
+                        ivClass = 'iv-high';
+                    } else {
+                        ivClass = 'iv-low';
+                    }
+                    
+                    // Calculate probability of trend reversal for losers
+                    const gapMagnitude = Math.abs(item.pct_change);
+                    const ivFactor = Math.min(item.implied_volatility / 100, 1.5);
+                    let probReversal = Math.min(gapMagnitude * 2 + ivFactor * 10, 95);
+                    probReversal = Math.max(probReversal, 5);
+                    const probDisplay = Math.round(probReversal) + '%';
+                    
+                    row.innerHTML = `
+                        <td class="rank-col">${item.rank}</td>
+                        <td class="ticker-col"><strong>${item.ticker}</strong></td>
+                        <td class="pct-col ${pctClass}">${pctDisplay}</td>
+                        <td class="price-col">$${item.price.toFixed(2)}</td>
+                        <td class="iv-col ${ivClass}">${ivDisplay}</td>
+                        <td class="prob-col">${probDisplay}</td>
+                        <td class="trade-plan-col">
+                            <a href="#" class="gap-trade-plan-link" data-ticker="${item.ticker}">Plan</a>
+                        </td>
+                    `;
+                    losersBody.appendChild(row);
+                });
+            }
+            
+            // Add event listeners for gap trade plan links
+            document.querySelectorAll('.gap-trade-plan-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const ticker = this.dataset.ticker;
+                    showGapTradePlan(ticker, gapData.date);
+                });
+            });
+        }
+        
+        // ── Show gap trade plan ──
+        async function showGapTradePlan(ticker, date) {
+            try {
+                const resp = await fetch(`/api/gap-trade-plan/${ticker}/${date}`);
+                if (!resp.ok) {
+                    throw new Error(`HTTP ${resp.status}`);
+                }
+                const plan = await resp.json();
+                
+                // Update popup content
+                document.getElementById('tradePlanTicker').textContent = `${ticker} - Gap Analysis`;
+                
+                // Set chart link
+                const mobileChartLink = document.getElementById('mobileChartLink');
+                const tvUrl = `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_${Date.now()}&symbol=${ticker}&interval=30&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=light&style=1&timezone=America%2FNew_York&studies_overrides={}&overrides={}&enabled_features=["header_widget"]&disabled_features=["use_localstorage_for_settings"]&locale=en&utm_source=hastek.net&utm_medium=widget&utm_campaign=chart&utm_term=${ticker}`;
+                
+                mobileChartLink.href = tvUrl;
+                mobileChartLink.textContent = `Open ${ticker} Chart`;
+                
+                // Build analysis HTML
+                const analysisPane = document.getElementById('analysisPane');
+                analysisPane.innerHTML = `
+                    <div class="trade-plan-details">
+                        <div class="plan-header">
+                            <h4>${plan.direction.toUpperCase()} - ${plan.sentiment.toUpperCase()}</h4>
+                            <p class="gap-desc">${plan.gap_description}</p>
+                        </div>
+                        
+                        <div class="plan-section">
+                            <h5>Analysis</h5>
+                            <p>${plan.analysis}</p>
+                            <p><strong>IV:</strong> ${plan.iv_analysis}</p>
+                        </div>
+                        
+                        <div class="plan-section">
+                            <h5>Trade Levels</h5>
+                            <div class="levels-grid">
+                                <div class="level-item">
+                                    <span class="level-label">Current</span>
+                                    <span class="level-value">$${plan.current_price.toFixed(2)}</span>
+                                </div>
+                                <div class="level-item">
+                                    <span class="level-label">Entry</span>
+                                    <span class="level-value entry">$${plan.entry.toFixed(2)}</span>
+                                </div>
+                                <div class="level-item">
+                                    <span class="level-label">Stop</span>
+                                    <span class="level-value stop">$${plan.stop.toFixed(2)}</span>
+                                </div>
+                                <div class="level-item">
+                                    <span class="level-label">Target</span>
+                                    <span class="level-value target">$${plan.target.toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="plan-section">
+                            <h5>Risk/Reward</h5>
+                            <p>R/R: 1:${plan.risk_reward.toFixed(2)}</p>
+                        </div>
+                    </div>
+                `;
+                
+                // Show popup
+                document.getElementById('tradePlanPopup').style.display = 'block';
+                document.getElementById('popupOverlay').style.display = 'block';
+                
+            } catch (error) {
+                console.error("Error loading gap trade plan:", error);
+                alert(`Could not load gap trade plan for ${ticker}`);
+            }
         }
 
         // ── Render table ──
@@ -215,7 +469,7 @@
             tradePlanTicker.textContent = `${ticker} — Trade Plan`;
             
             // Set up TradingView link for mobile
-            const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=D`;
+            const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=30`;
             const mobileChartLink = document.getElementById('mobileChartLink');
             if (mobileChartLink) {
                 mobileChartLink.href = tvUrl;

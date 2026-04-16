@@ -66,6 +66,8 @@ log = logging.getLogger("tracker")
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
+    
+    # Main short interest table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS short_interest (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,6 +77,7 @@ def init_db():
             market_cap TEXT,
             price REAL,
             put_call_ratio REAL,
+            implied_volatility REAL,
             poll_date TEXT NOT NULL,
             poll_ts INTEGER NOT NULL,
             UNIQUE(ticker, poll_date)
@@ -83,6 +86,49 @@ def init_db():
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_si_date ON short_interest(poll_date)
     """)
+    
+    # Gap gainers table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS gap_gainers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            pct_change REAL,
+            dollar_change REAL,
+            price REAL,
+            implied_volatility REAL,
+            market_cap TEXT,
+            gap_type TEXT,
+            poll_date TEXT NOT NULL,
+            poll_ts INTEGER NOT NULL,
+            rank INTEGER,
+            UNIQUE(ticker, poll_date)
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_gap_gainers_date ON gap_gainers(poll_date)
+    """)
+    
+    # Gap losers table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS gap_losers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            pct_change REAL,
+            dollar_change REAL,
+            price REAL,
+            implied_volatility REAL,
+            market_cap TEXT,
+            gap_type TEXT,
+            poll_date TEXT NOT NULL,
+            poll_ts INTEGER NOT NULL,
+            rank INTEGER,
+            UNIQUE(ticker, poll_date)
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_gap_losers_date ON gap_losers(poll_date)
+    """)
+    
     # Migrate: add put_call_ratio column if missing (existing DBs)
     try:
         conn.execute("SELECT put_call_ratio FROM short_interest LIMIT 1")
@@ -105,6 +151,8 @@ def prune_old_data():
     cutoff = (datetime.now(EST) - timedelta(days=KEEP_DAYS)).strftime("%Y-%m-%d")
     conn = sqlite3.connect(DB_PATH)
     conn.execute("DELETE FROM short_interest WHERE poll_date < ?", (cutoff,))
+    conn.execute("DELETE FROM gap_gainers WHERE poll_date < ?", (cutoff,))
+    conn.execute("DELETE FROM gap_losers WHERE poll_date < ?", (cutoff,))
     conn.commit()
     conn.close()
     # prune old chart images
@@ -310,6 +358,296 @@ def fetch_ticker_data(ticker):
     except Exception as e:
         log.error(f"Error fetching {ticker}: {e}")
         return None
+
+
+# ── Gap Data Collection ─────────────────────────────────────────────────
+
+def fetch_gap_data():
+    """Fetch top gap gainers and losers from Finviz with market cap filter."""
+    log.info("Fetching gap data from Finviz...")
+    
+    # Finviz screener URLs - try different patterns
+    url_patterns = [
+        # Pattern 1: Price change filters (more reliable than gap filters)
+        {
+            "gainers": "https://finviz.com/screener.ashx?v=111&f=cap_midover,cap_midunder,geo_usa,sh_avgvol_o1000,sh_price_o5,ta_change_u5&s=-change",  # Change > 5%, sorted descending
+            "losers": "https://finviz.com/screener.ashx?v=111&f=cap_midover,cap_midunder,geo_usa,sh_avgvol_o1000,sh_price_o5,ta_change_d5&s=change"    # Change < -5%, sorted ascending
+        },
+        # Pattern 2: Original gap filters as fallback
+        {
+            "gainers": "https://finviz.com/screener.ashx?v=111&f=cap_midover,cap_midunder,geo_usa,sh_avgvol_o1000,sh_price_o5,ta_gap_u&s=-change",
+            "losers": "https://finviz.com/screener.ashx?v=111&f=cap_midover,cap_midunder,geo_usa,sh_avgvol_o1000,sh_price_o5,ta_gap_d&s=change"
+        },
+        # Pattern 3: Simple gap filters without market cap
+        {
+            "gainers": "https://finviz.com/screener.ashx?v=111&f=ta_gap_u&s=-change",
+            "losers": "https://finviz.com/screener.ashx?v=111&f=ta_gap_d&s=change"
+        }
+    ]
+    
+    gap_gainers = []
+    gap_losers = []
+    
+    for pattern_idx, urls in enumerate(url_patterns):
+        try:
+            log.info(f"Trying URL pattern {pattern_idx + 1}...")
+            
+            # Fetch gap gainers
+            resp = requests.get(urls["gainers"], headers=FINVIZ_HEADERS, timeout=30)
+            if resp.status_code != 200:
+                log.warning(f"Pattern {pattern_idx + 1} gainers: HTTP {resp.status_code}")
+                continue
+                
+            soup = BeautifulSoup(resp.text, "html.parser")
+            
+            # Try to find the screener table
+            table = soup.find("table", class_="screener_table")
+            if not table:
+                # Try alternative table class
+                table = soup.find("table", {"cellpadding": "3", "cellspacing": "1", "border": "0", "width": "100%"})
+            
+            if table:
+                # Find all rows in the table (skip header)
+                rows = table.find_all("tr")[1:]  # Skip header row
+                
+                for i, row in enumerate(rows):  # Process ALL rows to get true top gap stocks
+                    cells = row.find_all("td")
+                    if len(cells) >= 11:  # Need at least 11 cells for basic data
+                        try:
+                            ticker = cells[1].get_text(strip=True)
+                            
+                            # Skip if ticker is empty or not uppercase letters
+                            if not ticker or not ticker.isupper() or len(ticker) > 5:
+                                continue
+                                
+                            # Try to extract price (column index may vary)
+                            price = 0.0
+                            change_pct = 0.0
+                            change_dollar = 0.0
+                            market_cap = "N/A"
+                            
+                            # Try different column indices
+                            for price_idx in [8, 9, 10]:
+                                if price_idx < len(cells):
+                                    price_text = cells[price_idx].get_text(strip=True)
+                                    price = parse_price(price_text)
+                                    if price > 0:
+                                        break
+                            
+                            # Try to find change columns
+                            for change_idx in [9, 10, 11]:
+                                if change_idx < len(cells):
+                                    change_text = cells[change_idx].get_text(strip=True)
+                                    if "%" in change_text:
+                                        change_pct = parse_pct(change_text)
+                                        # Next column might be dollar change
+                                        if change_idx + 1 < len(cells):
+                                            dollar_text = cells[change_idx + 1].get_text(strip=True)
+                                            change_dollar = parse_float(dollar_text.replace("$", ""))
+                                        break
+                            
+                            # Try to find market cap
+                            for cap_idx in [5, 6, 7]:
+                                if cap_idx < len(cells):
+                                    cap_text = cells[cap_idx].get_text(strip=True)
+                                    if "B" in cap_text or "M" in cap_text or cap_text.replace(".", "").isdigit():
+                                        market_cap = cap_text
+                                        break
+                            
+                            # Get IV from yfinance
+                            implied_volatility = 0.0
+                            try:
+                                import yfinance as yf
+                                stock = yf.Ticker(ticker)
+                                options = stock.options
+                                if options:
+                                    exp = options[0]
+                                    opt_chain = stock.option_chain(exp)
+                                    calls = opt_chain.calls
+                                    if not calls.empty:
+                                        # Find ATM call
+                                        atm_call = calls.iloc[(calls['strike'] - price).abs().argsort()[:1]]
+                                        if not atm_call.empty:
+                                            implied_volatility = float(atm_call.iloc[0]['impliedVolatility']) * 100
+                                time.sleep(0.2)  # Rate limiting
+                            except Exception as e:
+                                log.warning(f"Could not get IV for {ticker}: {e}")
+                            
+                            # Only add if we have valid data AND positive change (gap up)
+                            if ticker and price > 0 and change_pct > 0:
+                                gap_gainers.append({
+                                    "ticker": ticker,
+                                    "pct_change": change_pct,
+                                    "dollar_change": change_dollar,
+                                    "price": price,
+                                    "implied_volatility": implied_volatility,
+                                    "market_cap": market_cap,
+                                    "gap_type": "up"
+                                })
+                        except Exception as e:
+                            log.warning(f"Error parsing row {i}: {e}")
+                            continue
+            
+            # Fetch gap losers
+            resp = requests.get(urls["losers"], headers=FINVIZ_HEADERS, timeout=30)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, "html.parser")
+                table = soup.find("table", class_="screener_table")
+                if not table:
+                    table = soup.find("table", {"cellpadding": "3", "cellspacing": "1", "border": "0", "width": "100%"})
+                
+                if table:
+                    rows = table.find_all("tr")[1:]  # Skip header row
+                    
+                    for i, row in enumerate(rows):  # Process ALL rows to get true top gap stocks
+                        cells = row.find_all("td")
+                        if len(cells) >= 11:
+                            try:
+                                ticker = cells[1].get_text(strip=True)
+                                
+                                if not ticker or not ticker.isupper() or len(ticker) > 5:
+                                    continue
+                                    
+                                price = 0.0
+                                change_pct = 0.0
+                                change_dollar = 0.0
+                                market_cap = "N/A"
+                                
+                                for price_idx in [8, 9, 10]:
+                                    if price_idx < len(cells):
+                                        price_text = cells[price_idx].get_text(strip=True)
+                                        price = parse_price(price_text)
+                                        if price > 0:
+                                            break
+                                
+                                for change_idx in [9, 10, 11]:
+                                    if change_idx < len(cells):
+                                        change_text = cells[change_idx].get_text(strip=True)
+                                        if "%" in change_text:
+                                            change_pct = parse_pct(change_text)
+                                            if change_idx + 1 < len(cells):
+                                                dollar_text = cells[change_idx + 1].get_text(strip=True)
+                                                change_dollar = parse_float(dollar_text.replace("$", ""))
+                                            break
+                                
+                                for cap_idx in [5, 6, 7]:
+                                    if cap_idx < len(cells):
+                                        cap_text = cells[cap_idx].get_text(strip=True)
+                                        if "B" in cap_text or "M" in cap_text or cap_text.replace(".", "").isdigit():
+                                            market_cap = cap_text
+                                            break
+                                
+                                # Get IV from yfinance
+                                implied_volatility = 0.0
+                                try:
+                                    import yfinance as yf
+                                    stock = yf.Ticker(ticker)
+                                    options = stock.options
+                                    if options:
+                                        exp = options[0]
+                                        opt_chain = stock.option_chain(exp)
+                                        calls = opt_chain.calls
+                                        if not calls.empty:
+                                            atm_call = calls.iloc[(calls['strike'] - price).abs().argsort()[:1]]
+                                            if not atm_call.empty:
+                                                implied_volatility = float(atm_call.iloc[0]['impliedVolatility']) * 100
+                                    time.sleep(0.2)  # Rate limiting
+                                except Exception as e:
+                                    log.warning(f"Could not get IV for {ticker}: {e}")
+                                
+                                # Only add if we have valid data AND negative change (gap down)
+                                if ticker and price > 0 and change_pct < 0:
+                                    gap_losers.append({
+                                        "ticker": ticker,
+                                        "pct_change": change_pct,
+                                        "dollar_change": change_dollar,
+                                        "price": price,
+                                        "implied_volatility": implied_volatility,
+                                        "market_cap": market_cap,
+                                        "gap_type": "down"
+                                    })
+                            except Exception as e:
+                                log.warning(f"Error parsing loser row {i}: {e}")
+                                continue
+                
+            # If we found data with this pattern, break
+            if gap_gainers or gap_losers:
+                log.info(f"Pattern {pattern_idx + 1} successful")
+                break
+                
+        except Exception as e:
+            log.warning(f"Error with pattern {pattern_idx + 1}: {e}")
+            continue
+    
+    # Sort by percentage change
+    # Gap gainers: sort by highest positive percentage (largest gap up)
+    # Gap losers: sort by most negative percentage (largest gap down)
+    gap_gainers.sort(key=lambda x: x["pct_change"], reverse=True)
+    gap_losers.sort(key=lambda x: x["pct_change"])  # Ascending (most negative first)
+    
+    # Update ranks after sorting
+    for i, item in enumerate(gap_gainers[:5]):
+        item["rank"] = i + 1
+    for i, item in enumerate(gap_losers[:5]):
+        item["rank"] = i + 1
+    
+    log.info(f"Found {len(gap_gainers)} gap gainers and {len(gap_losers)} gap losers")
+    return gap_gainers[:5], gap_losers[:5]  # Return top 5 each
+
+
+def poll_gap_data():
+    """Poll and store gap data at market open (9:30 AM EST)."""
+    log.info("Starting gap data poll...")
+    today = datetime.now(EST).strftime("%Y-%m-%d")
+    ts = int(time.time())
+    
+    gap_gainers, gap_losers = fetch_gap_data()
+    
+    if not gap_gainers and not gap_losers:
+        log.warning("No gap data collected — skipping DB write")
+        return
+    
+    conn = sqlite3.connect(DB_PATH)
+    
+    # Delete existing gap data for today before inserting new data
+    conn.execute("DELETE FROM gap_gainers WHERE poll_date = ?", (today,))
+    conn.execute("DELETE FROM gap_losers WHERE poll_date = ?", (today,))
+    
+    # Store gap gainers
+    for item in gap_gainers:
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO gap_gainers 
+                (ticker, pct_change, dollar_change, price, implied_volatility, 
+                 market_cap, gap_type, poll_date, poll_ts, rank)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                item["ticker"], item["pct_change"], item["dollar_change"],
+                item["price"], item["implied_volatility"], item["market_cap"],
+                item["gap_type"], today, ts, item["rank"]
+            ))
+        except Exception as e:
+            log.error(f"Error storing gap gainer {item['ticker']}: {e}")
+    
+    # Store gap losers
+    for item in gap_losers:
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO gap_losers 
+                (ticker, pct_change, dollar_change, price, implied_volatility, 
+                 market_cap, gap_type, poll_date, poll_ts, rank)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                item["ticker"], item["pct_change"], item["dollar_change"],
+                item["price"], item["implied_volatility"], item["market_cap"],
+                item["gap_type"], today, ts, item["rank"]
+            ))
+        except Exception as e:
+            log.error(f"Error storing gap loser {item['ticker']}: {e}")
+    
+    conn.commit()
+    conn.close()
+    log.info(f"Stored {len(gap_gainers)} gap gainers and {len(gap_losers)} gap losers")
 
 
 # ── Polling ─────────────────────────────────────────────────────────────
@@ -713,6 +1051,170 @@ def api_poll():
     return jsonify({"status": "ok"})
 
 
+@app.route("/api/gap-data/<date>")
+def api_gap_data(date):
+    """Return gap gainers and losers for a given date."""
+    conn = sqlite3.connect(DB_PATH)
+    
+    # Get gap gainers
+    gainers_rows = conn.execute("""
+        SELECT ticker, pct_change, dollar_change, price, implied_volatility, 
+               market_cap, rank
+        FROM gap_gainers
+        WHERE poll_date = ?
+        ORDER BY rank
+        LIMIT 5
+    """, (date,)).fetchall()
+    
+    # Get gap losers
+    losers_rows = conn.execute("""
+        SELECT ticker, pct_change, dollar_change, price, implied_volatility, 
+               market_cap, rank
+        FROM gap_losers
+        WHERE poll_date = ?
+        ORDER BY rank
+        LIMIT 5
+    """, (date,)).fetchall()
+    
+    conn.close()
+    
+    gainers = []
+    for row in gainers_rows:
+        gainers.append({
+            "ticker": row[0],
+            "pct_change": row[1],
+            "dollar_change": row[2],
+            "price": row[3],
+            "implied_volatility": row[4],
+            "market_cap": row[5],
+            "rank": row[6]
+        })
+    
+    losers = []
+    for row in losers_rows:
+        losers.append({
+            "ticker": row[0],
+            "pct_change": row[1],
+            "dollar_change": row[2],
+            "price": row[3],
+            "implied_volatility": row[4],
+            "market_cap": row[5],
+            "rank": row[6]
+        })
+    
+    return jsonify({
+        "gainers": gainers,
+        "losers": losers,
+        "date": date
+    })
+
+
+@app.route("/api/gap-trade-plan/<ticker>/<date>")
+def api_gap_trade_plan(ticker, date):
+    """Generate a trade plan for a gap stock."""
+    conn = sqlite3.connect(DB_PATH)
+    
+    # Try to find in gap gainers first
+    row = conn.execute("""
+        SELECT ticker, pct_change, dollar_change, price, implied_volatility, 
+               market_cap, gap_type
+        FROM gap_gainers
+        WHERE ticker = ? AND poll_date = ?
+    """, (ticker, date)).fetchone()
+    
+    if not row:
+        # Try gap losers
+        row = conn.execute("""
+            SELECT ticker, pct_change, dollar_change, price, implied_volatility, 
+                   market_cap, gap_type
+            FROM gap_losers
+            WHERE ticker = ? AND poll_date = ?
+        """, (ticker, date)).fetchone()
+    
+    conn.close()
+    
+    if not row:
+        return jsonify({"error": "Ticker not found in gap data for this date"}), 404
+    
+    ticker, pct_change, dollar_change, price, iv, market_cap, gap_type = row
+    
+    # Generate gap-specific trade plan
+    if gap_type == "up":
+        direction = "gap up"
+        sentiment = "bullish"
+        # Format dollar amount with commas
+        formatted_dollar = f"{abs(dollar_change):,.2f}"
+        gap_desc = f"Gapped up {abs(pct_change):.2f}% (${formatted_dollar})"
+        
+        # Analysis for gap ups
+        if pct_change > 5:
+            analysis = "Strong gap up suggests continuation potential. Look for consolidation above gap level."
+            entry = price * 0.99  # Slightly below current price
+            stop = price * 0.94   # Below gap fill level
+            target = price * 1.08  # 8% target
+        elif pct_change > 2:
+            analysis = "Moderate gap up. Watch for partial fill before continuation."
+            entry = price * 0.985
+            stop = price * 0.96
+            target = price * 1.06
+        else:
+            analysis = "Small gap up. Could be noise. Wait for confirmation."
+            entry = price * 0.99
+            stop = price * 0.97
+            target = price * 1.04
+    else:  # gap_type == "down"
+        direction = "gap down"
+        sentiment = "bearish"
+        # Format dollar amount with commas
+        formatted_dollar = f"{abs(dollar_change):,.2f}"
+        gap_desc = f"Gapped down {abs(pct_change):.2f}% (${formatted_dollar})"
+        
+        # Analysis for gap downs
+        if pct_change < -5:
+            analysis = "Strong gap down suggests further downside. Resistance at gap fill level."
+            entry = price * 1.01  # Slightly above current price for short
+            stop = price * 1.06   # Above gap fill level
+            target = price * 0.92  # 8% target for short
+        elif pct_change < -2:
+            analysis = "Moderate gap down. May see dead cat bounce before continuation."
+            entry = price * 1.015
+            stop = price * 1.04
+            target = price * 0.94
+        else:
+            analysis = "Small gap down. Could be normal pullback. Wait for breakdown confirmation."
+            entry = price * 1.01
+            stop = price * 1.03
+            target = price * 0.97
+    
+    # Add IV analysis
+    if iv > 50:
+        iv_analysis = f"High IV ({iv:.1f}%) suggests elevated option premiums. Consider defined-risk strategies."
+    elif iv > 25:
+        iv_analysis = f"Moderate IV ({iv:.1f}%). Options fairly priced."
+    else:
+        iv_analysis = f"Low IV ({iv:.1f}%). Options relatively cheap."
+    
+    trade_plan = {
+        "ticker": ticker,
+        "direction": direction,
+        "sentiment": sentiment,
+        "gap_description": gap_desc,
+        "analysis": analysis,
+        "iv_analysis": iv_analysis,
+        "current_price": price,
+        "gap_percent": pct_change,
+        "gap_dollar": dollar_change,
+        "implied_volatility": iv,
+        "market_cap": market_cap,
+        "entry": round(entry, 2),
+        "stop": round(stop, 2),
+        "target": round(target, 2),
+        "risk_reward": round(abs(target - entry) / abs(entry - stop), 2)
+    }
+    
+    return jsonify(trade_plan)
+
+
 # ── Scheduler (runs once in the gunicorn preload master process) ────────
 
 _scheduler_started = False
@@ -745,7 +1247,15 @@ def start_scheduler():
     hours = schedule_cfg.get("hours", [10, 15])
     days = schedule_cfg.get("days", "mon-fri")
 
+    # Schedule gap polls from config
+    gap_schedule_cfg = CONFIG.get("gap_poll_schedule", {})
+    gap_hour = gap_schedule_cfg.get("hour", 9)
+    gap_minute = gap_schedule_cfg.get("minute", 30)
+    gap_days = gap_schedule_cfg.get("days", "mon-fri")
+
     scheduler = BackgroundScheduler(timezone=EST)
+    
+    # Schedule regular short interest polls
     for h in hours:
         job_id = f"poll_{h:02d}00"
         scheduler.add_job(
@@ -754,8 +1264,18 @@ def start_scheduler():
             id=job_id,
             name=f"Poll at {h}:00 EST ({days})",
         )
+    
+    # Schedule gap data poll at market open
+    gap_job_id = f"gap_poll_{gap_hour:02d}{gap_minute:02d}"
+    scheduler.add_job(
+        poll_gap_data,
+        CronTrigger(hour=gap_hour, minute=gap_minute, day_of_week=gap_days, timezone=EST),
+        id=gap_job_id,
+        name=f"Gap poll at {gap_hour}:{gap_minute:02d} EST ({gap_days})",
+    )
+    
     scheduler.start()
-    log.info(f"Scheduler set: {hours} EST, {days}")
+    log.info(f"Scheduler set: short interest at {hours} EST, gap at {gap_hour}:{gap_minute:02d} EST, {days}")
 
 
 # Start scheduler when module loads (gunicorn --preload calls this once)

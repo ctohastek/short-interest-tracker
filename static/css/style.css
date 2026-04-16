@@ -47,7 +47,7 @@ header {
 }
 
 header h1 {
-    font-size: 1.5rem;  /* Reduced from 1.9rem (about 2 sizes smaller) */
+    font-size: 1.4rem;  /* Match gap table header size */
     font-weight: 700;
     letter-spacing: -0.02em;
     margin-bottom: 0.25rem;
@@ -121,8 +121,11 @@ header h1 {
 }
 
 #currentDate {
-    font-weight: 600;
-    color: var(--text);
+    display: none;  /* Hide date stamp as requested */
+}
+
+#lastPoll {
+    margin-left: auto;  /* Push to right side */
 }
 
 /* ── Table ── */
@@ -374,7 +377,7 @@ footer a:hover {
 .trade-plan-content {
     padding: 0;
     overflow: hidden;
-    max-height: calc(92vh - 50px);  /* Adjusted for 92vh popup */
+    height: calc(92vh - 50px);  /* Changed from max-height to height */
 }
 
 .trade-plan-layout {
@@ -389,6 +392,7 @@ footer a:hover {
     display: flex;
     flex-direction: column;
     padding: 0;
+    height: 100%;
 }
 
 .chart-container {
@@ -399,6 +403,8 @@ footer a:hover {
     text-decoration: none;
     color: inherit;
     cursor: pointer;
+    width: 100%;
+    height: 100%;
     /* Temporary debug background */
     /* background: rgba(255, 0, 0, 0.1); */
 }
@@ -408,18 +414,25 @@ footer a:hover {
     height: 100%;
     border: none;
     display: block;
-    pointer-events: none !important;  /* Force clicks to pass through */
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 1;
 }
 
-/* Make the TradingView chart itself 60% of its original size on desktop */
+/* TradingView chart sizing - removed scaling to fix smashed chart */
 @media (min-width: 641px) {
     .tradingview-chart {
-        transform: scale(0.6);
-        transform-origin: top left;
-        width: 166.67%;  /* Compensate for scaling */
-        height: 166.67%;
+        /* No scaling - chart displays at full size */
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
     }
 }
 
@@ -439,28 +452,9 @@ footer a:hover {
 }
 
 .chart-container:hover .chart-overlay {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.1);
     outline: 2px solid var(--accent);
     outline-offset: -2px;
-}
-
-.chart-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0);
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    text-decoration: none;  /* Remove underline from link */
-    color: inherit;         /* Inherit text color */
-    transition: background 0.2s ease;
-}
-
-.chart-container:hover .chart-overlay {
-    background: rgba(0, 0, 0, 0.1);
 }
 
 .chart-click-message {
@@ -612,4 +606,216 @@ footer a:hover {
 
 .mobile-tradingview-link a:hover {
     background: #2c5282;
+}
+
+/* ── Gap Tables ── */
+.gap-section {
+    margin-top: 2.5rem;
+    margin-bottom: 2rem;
+}
+
+.gap-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.gap-header {
+    font-size: 1.4rem;  /* Match main header size */
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    margin: 0;
+}
+
+.gap-poll-time {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.gap-subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.gap-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    margin-bottom: 1rem;
+}
+
+.gap-table thead {
+    background: var(--accent-light);
+    border-bottom: 2px solid var(--border);
+}
+
+.gap-table th {
+    padding: 0.7rem 8px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+}
+
+/* Left align ticker column header */
+.gap-table th.ticker-col {
+    text-align: left;
+}
+
+.gap-table td {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid #edf2f7;
+    font-size: 0.8rem;  /* Match main table font size */
+    text-align: center;
+    vertical-align: middle;
+    line-height: 1.2;
+}
+
+/* Left align ticker column cells */
+.gap-table td.ticker-col {
+    text-align: left;
+    font-weight: 600;
+}
+
+.gap-table tbody tr:nth-child(even) {
+    background: var(--row-gray);
+}
+
+.gap-table tbody tr:hover {
+    background: var(--accent-light);
+}
+
+/* Gap-specific column widths */
+/* Gap table column widths - match top table structure */
+.gap-table .rank-col { width: 3rem; text-align: center; color: var(--text-muted); font-weight: 500; padding: 0 8px; }
+.gap-table .ticker-col { width: 6rem; padding: 0 8px; text-align: left; }
+.gap-table .ticker-col strong { color: var(--text); letter-spacing: 0.02em; }
+.gap-table .pct-col { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; }
+.gap-table .dollar-col { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
+.gap-table .price-col { text-align: center; font-variant-numeric: tabular-nums; padding: 0 8px; }
+.gap-table .iv-col { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; width: 4rem; }
+.gap-table .prob-col { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; width: 5rem; }
+.gap-table .mcap-col { text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); padding: 0 8px; }
+.gap-table .trade-plan-col { white-space: nowrap; text-align: center; padding: 0 8px; }
+
+/* Gap table arrows */
+.gap-arrow {
+    font-size: 1.1em;
+    font-weight: 400;  /* Regular weight, not bold */
+    margin-right: 0.3rem;
+}
+
+.up-arrow {
+    color: #10b981;  /* Green for gainers */
+}
+
+.down-arrow {
+    color: #ef4444;  /* Red for losers */
+}
+
+/* Regular link styling (not button) */
+.regular-link {
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.regular-link:hover {
+    text-decoration: underline;
+    color: #1d4ed8;
+}
+
+/* TradingView button */
+.tradingview-button {
+    display: inline-block;
+    background: linear-gradient(135deg, #26a69a 0%, #1e88e5 100%);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tradingview-button:hover {
+    background: linear-gradient(135deg, #1e88e5 0%, #26a69a 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.tradingview-button:active {
+    transform: translateY(0);
+}
+
+/* Gap percentage colors */
+.gap-up {
+    color: #10b981;  /* Green for positive */
+    font-weight: 600;
+}
+
+.gap-down {
+    color: #ef4444;  /* Red for negative */
+    font-weight: 600;
+}
+
+/* Gap trade plan link - matches main table style */
+.gap-trade-plan-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.gap-trade-plan-link:hover {
+    background: var(--accent-light);
+    text-decoration: underline;
+}
+
+/* Responsive gap tables */
+@media (max-width: 640px) {
+    .gap-header {
+        font-size: 1rem;
+    }
+    
+    .gap-table th,
+    .gap-table td {
+        padding: 0.5rem 0.35rem;
+        font-size: 0.8rem;
+    }
+    
+    .gap-table .mcap-col {
+        display: none;
+    }
+    
+    .gap-table .trade-plan-col {
+        width: 25%;
+    }
+    
+    .gap-table .dollar-col {
+        display: none;
+    }
+    
+    .gap-table .prob-col {
+        display: none;
+    }
 }
