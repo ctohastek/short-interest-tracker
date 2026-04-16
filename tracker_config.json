@@ -12,8 +12,8 @@
         "enabled": true,
         "realm": "Short Interest Tracker",
         "users": {
-            "admin": "string",
-            "user2": "string"
+            "admin": "changeme",
+            "traderjoe": "spy0DTE"
         }
     },
     "poll_schedule": {
