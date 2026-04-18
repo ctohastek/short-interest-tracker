@@ -1051,6 +1051,51 @@ def api_poll():
     return jsonify({"status": "ok"})
 
 
+@app.route("/api/watchlist", methods=["GET"])
+def api_watchlist_get():
+    """Return the current watchlist."""
+    try:
+        with open(_watchlist_path, "r") as f:
+            tickers = json.load(f)
+        return jsonify(sorted(tickers))
+    except Exception as e:
+        log.error(f"Error reading watchlist: {e}")
+        return jsonify([]), 500
+
+
+@app.route("/api/watchlist", methods=["POST"])
+def api_watchlist_save():
+    """Save an updated watchlist. Validates all entries."""
+    TICKER_RE = re.compile(r'^[A-Z]{1,5}$')
+    try:
+        data = request.get_json(silent=True)
+        if not isinstance(data, list):
+            return jsonify({"error": "Expected a JSON array"}), 400
+        # Sanitize: only uppercase letters, 1-5 chars, max 100 items
+        clean = []
+        seen = set()
+        for item in data:
+            if not isinstance(item, str):
+                continue
+            t = re.sub(r'[^A-Z]', '', item.upper())[:5]
+            if t and TICKER_RE.match(t) and t not in seen:
+                clean.append(t)
+                seen.add(t)
+                if len(clean) >= 100:
+                    break
+        clean.sort()
+        with open(_watchlist_path, "w") as f:
+            json.dump(clean, f, indent=2)
+        # Reload in-memory ticker list
+        global TICKERS
+        TICKERS = clean
+        log.info(f"Watchlist updated: {len(clean)} tickers")
+        return jsonify({"status": "ok", "count": len(clean)})
+    except Exception as e:
+        log.error(f"Error saving watchlist: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/gap-data/<date>")
 def api_gap_data(date):
     """Return gap gainers and losers for a given date."""
