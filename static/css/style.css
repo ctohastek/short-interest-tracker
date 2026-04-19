@@ -1,5 +1,5 @@
 /* ── Short Interest Tracker — Styles ── */
-/* v=20260418_1348 */
+/* v=20260419_1120 */
 
 :root {
     --bg: #fafbfc;
@@ -15,7 +15,7 @@
     --med-si: #dd6b20;
     --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
     --shadow-lg: 0 10px 25px rgba(0,0,0,0.12), 0 4px 10px rgba(0,0,0,0.08);
-    --radius: 8px;
+    --radius: 0px;
 }
 
 * {
@@ -47,10 +47,15 @@ header {
 }
 
 header h1 {
-    font-size: 1.4rem;  /* Match gap table header size */
+    font-size: 0.85rem;  /* ~60% of original 1.4rem */
     font-weight: 700;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
     margin-bottom: 0.25rem;
+}
+
+header h1 .header-icon {
+    font-size: 0.75rem;  /* scale icon with title */
+    vertical-align: middle;
 }
 
 .subtitle {
@@ -85,7 +90,7 @@ header h1 {
 .date-btn {
     padding: 0.35rem 0.75rem;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 0;
     background: var(--surface);
     color: var(--text);
     font-size: 0.82rem;
@@ -133,7 +138,7 @@ table {
     width: 100%;
     border-collapse: collapse;
     background: var(--surface);
-    border-radius: var(--radius);
+    border-radius: 0;
     overflow: hidden;
     box-shadow: var(--shadow);
 }
@@ -257,13 +262,13 @@ td.iv-extreme { color: #e53e3e !important; font-weight: 700 !important; }  /* re
 }
 
 .lookup-btn, .reset-btn {
-    padding: 0.4rem 0.8rem;  /* Smaller button */
+    padding: 0.4rem 0.8rem;
     background: var(--accent);
     color: white;
     border: none;
-    border-radius: var(--radius);
-    font-size: 0.85rem;  /* Smaller font */
-    font-weight: 600;
+    border-radius: 0;
+    font-size: 0.85rem;
+    font-weight: 400;
     cursor: pointer;
     transition: background 0.2s ease;
 }
@@ -285,7 +290,7 @@ td.iv-extreme { color: #e53e3e !important; font-weight: 700 !important; }  /* re
     padding: 0.5rem 0.75rem;
     background: #fed7d7;
     border: 1px solid #fc8181;
-    border-radius: var(--radius);
+    border-radius: 0;
     color: #c53030;
     font-size: 0.85rem;
     text-align: right;  /* Error messages also right-aligned */
@@ -331,7 +336,7 @@ footer a:hover {
     height: 92vh;  /* Increased to 92vh */
     max-height: 92vh;
     background: var(--surface);
-    border-radius: var(--radius);
+    border-radius: 0;
     box-shadow: var(--shadow-lg);
     z-index: 10000;
     overflow: hidden;
@@ -365,7 +370,7 @@ footer a:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: 0;
 }
 
 .close-btn:hover {
@@ -460,7 +465,7 @@ footer a:hover {
     background: rgba(0, 0, 0, 0.7);
     color: white;
     padding: 0.5rem 1rem;
-    border-radius: 4px;
+    border-radius: 0;
     font-size: 0.8rem;
     margin-bottom: 1rem;
     opacity: 0;
@@ -511,7 +516,7 @@ footer a:hover {
 
 .support-box, .resistance-box {
     padding: 0.75rem;
-    border-radius: 6px;
+    border-radius: 0;
     border: 1px solid var(--border);
 }
 
@@ -549,7 +554,7 @@ footer a:hover {
     font-size: 0.8rem;
     font-weight: 500;
     padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    border-radius: 0;
     transition: all 0.15s ease;
     white-space: nowrap;
 }
@@ -598,8 +603,8 @@ footer a:hover {
     background: var(--accent);
     color: white;
     text-decoration: none;
-    border-radius: var(--radius);
-    font-weight: 600;
+    border-radius: 0;
+    font-weight: 400;
     font-size: 0.9rem;
 }
 
@@ -636,7 +641,8 @@ footer a:hover {
 
 .gap-subtitle {
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: 0.9rem;  /* matches .subtitle */
+    text-align: left;
     margin-bottom: 0.75rem;
     display: flex;
     justify-content: space-between;
@@ -647,7 +653,7 @@ footer a:hover {
     width: 100%;
     border-collapse: collapse;
     background: var(--surface);
-    border-radius: var(--radius);
+    border-radius: 0;
     overflow: hidden;
     box-shadow: var(--shadow);
     margin-bottom: 1rem;
@@ -744,9 +750,9 @@ footer a:hover {
     background: linear-gradient(135deg, #26a69a 0%, #1e88e5 100%);
     color: white;
     padding: 0.75rem 1.5rem;
-    border-radius: 8px;
+    border-radius: 0;
     text-decoration: none;
-    font-weight: 600;
+    font-weight: 400;
     font-size: 0.95rem;
     transition: all 0.2s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -780,7 +786,7 @@ footer a:hover {
     font-size: 0.8rem;
     font-weight: 500;
     padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    border-radius: 0;
     transition: all 0.15s ease;
     white-space: nowrap;
 }
@@ -830,7 +836,7 @@ footer a:hover {
     max-width: 95vw;
     max-height: 80vh;
     background: var(--surface);
-    border-radius: var(--radius);
+    border-radius: 0;
     box-shadow: var(--shadow-lg);
     z-index: 10001;
     overflow: hidden;
@@ -870,7 +876,7 @@ footer a:hover {
     max-height: 300px;
     overflow-y: auto;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 0;
 }
 
 .watchlist-ticker-list li {
@@ -916,7 +922,7 @@ footer a:hover {
     flex: 1;
     padding: 0.35rem 0.5rem;
     border: 1px solid #94a3b8;
-    border-radius: 4px;
+    border-radius: 0;
     font-size: 0.9rem;
     font-family: inherit;
     text-transform: uppercase;
@@ -932,9 +938,9 @@ footer a:hover {
     background: var(--accent);
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 0;
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: 400;
     cursor: pointer;
 }
 
@@ -958,9 +964,9 @@ footer a:hover {
     background: #e53e3e;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 0;
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: 400;
     cursor: pointer;
 }
 
@@ -973,9 +979,9 @@ footer a:hover {
     background: #38a169;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 0;
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: 400;
     cursor: pointer;
 }
 
@@ -983,12 +989,12 @@ footer a:hover {
     background: #276749;
 }
 
-.watchlist-open-btn {
+.watchlist-open-btn-UNUSED {
     padding: 0.4rem 0.8rem;
     background: var(--surface);
     color: var(--text-muted);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 0;
     font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;

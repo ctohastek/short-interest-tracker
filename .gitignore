@@ -1,4 +1,5 @@
 __pycache__/
+data/
 *.py[cod]
 *$py.class
 *.so
@@ -17,7 +18,5 @@ build/
 *.swo
 *~
 .DS_Store
-data/*
-data/gunicorn*log
 .superpowers
 tracker_config.json

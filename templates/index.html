@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260418_1348">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260419_1120">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>📉 Short Interest Tracker</h1>
+            <h1><span class="header-icon">📉</span> Short Interest Tracker</h1>
             <p class="subtitle">Top 12 highest short interest from watchlist</p>
         </header>
 
@@ -63,16 +63,13 @@
             <div id="lookupError" class="error-message" style="display: none;"></div>
         </div>
         
-        <!-- Gap Gainers Table -->
+        <!-- Combined Gap Gainers & Losers Table -->
         <div class="gap-section">
-            <div class="gap-header-row">
-                <h2 class="gap-header"><span class="gap-arrow up-arrow">▲</span> Top 5 Gap Gainers</h2>
-            </div>
             <div class="gap-subtitle">
-                <span>Pre-Market Gainers polled from 10B to 200B market cap tickers</span>
-                <div class="gap-poll-time" id="gapGainersPollTime"></div>
+                <span>Pre-Mkt Top Gainers &amp; Losers (Mkt Cap 10B–200B)</span>
+                <div class="gap-poll-time" id="gapCombinedPollTime"></div>
             </div>
-            <table class="gap-table" id="gapGainersTable">
+            <table class="gap-table" id="gapCombinedTable">
                 <thead>
                     <tr>
                         <th class="rank-col"></th>
@@ -86,22 +83,20 @@
                         <th class="trade-plan-col">Gap Trade Plan</th>
                     </tr>
                 </thead>
-                <tbody id="gapGainersBody">
+                <tbody id="gapCombinedBody">
                     <tr><td colspan="9" class="loading">Loading gap data…</td></tr>
                 </tbody>
             </table>
         </div>
-        
-        <!-- Gap Losers Table -->
-        <div class="gap-section">
-            <div class="gap-header-row">
-                <h2 class="gap-header"><span class="gap-arrow down-arrow">▼</span> Top 5 Gap Losers</h2>
-            </div>
+
+
+        <!-- Intraday Movers Table -->
+        <div class="gap-section" id="intradaySection">
             <div class="gap-subtitle">
-                <span>Pre-Market Losers polled from 10B to 200B market cap tickers</span>
-                <div class="gap-poll-time" id="gapLosersPollTime"></div>
+                <span>Intraday Top Gainers &amp; Losers (Watchlist)</span>
+                <div class="gap-poll-time" id="intradayPollTime"></div>
             </div>
-            <table class="gap-table" id="gapLosersTable">
+            <table class="gap-table" id="intradayTable">
                 <thead>
                     <tr>
                         <th class="rank-col"></th>
@@ -110,13 +105,14 @@
                         <th class="dollar-col">$CHANGE</th>
                         <th class="price-col">Price</th>
                         <th class="iv-col">IV</th>
-                        <th class="prob-col">TREND REV</th>
+                        <th class="pc-col">P/C</th>
+                        <th class="pct-col si-col">Short%</th>
                         <th class="mcap-col">Mkt Cap</th>
-                        <th class="trade-plan-col">Gap Trade Plan</th>
+                        <th class="trade-plan-col">Trade Plan</th>
                     </tr>
                 </thead>
-                <tbody id="gapLosersBody">
-                    <tr><td colspan="9" class="loading">Loading gap data…</td></tr>
+                <tbody id="intradayBody">
+                    <tr><td colspan="10" class="loading">Loading intraday data…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -165,7 +161,7 @@
             <div class="watchlist-error" id="watchlistError"></div>
             <ul class="watchlist-ticker-list" id="watchlistTickerList"></ul>
             <div class="watchlist-add-row">
-                <input type="text" id="watchlistAddInput" placeholder="e.g. MSFT" maxlength="5" autocomplete="off" spellcheck="false">
+                <input type="text" id="watchlistAddInput" placeholder="" maxlength="5" autocomplete="off" spellcheck="false">
                 <button type="button" class="watchlist-add-btn" id="watchlistAddBtn">Add</button>
             </div>
         </div>
@@ -212,6 +208,8 @@
             
             // Also load gap data
             await loadGapData(date);
+            // Also load intraday movers
+            await loadIntradayData(date);
         }
         
         // ── Load gap data ──
@@ -228,16 +226,12 @@
                     const ts = mainData[0].poll_ts;
                     const d = new Date(ts * 1000);
                     const timeStr = `Last polled: ${d.toLocaleString()}`;
-                    document.getElementById('gapGainersPollTime').textContent = timeStr;
-                    document.getElementById('gapLosersPollTime').textContent = timeStr;
+                    const el = document.getElementById('gapCombinedPollTime');
+                    if (el) el.textContent = timeStr;
                 }
             } catch (error) {
-                console.error("Error loading gap data:", error);
-                // Show empty state
-                document.getElementById("gapGainersBody").innerHTML = 
-                    '<tr><td colspan="8" class="loading">Error loading gap data</td></tr>';
-                document.getElementById("gapLosersBody").innerHTML = 
-                    '<tr><td colspan="8" class="loading">Error loading gap data</td></tr>';
+                const body = document.getElementById('gapCombinedBody');
+                if (body) body.innerHTML = '<tr><td colspan="9" class="loading">Error loading gap data</td></tr>';
             }
         }
         
@@ -260,134 +254,189 @@
             return `$${formatCurrency(num)}`;
         }
         
-        // ── Render gap tables ──
+        // ── Render merged gap table (5 gainers + 5 losers, sorted by %CHANGE desc) ──
+        function renderGapRow(item) {
+            const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
+            const pctDisplay = (item.pct_change >= 0 ? '+' : '') + item.pct_change.toFixed(2) + '%';
+            const dollarDisplay = formatDollarChange(item.dollar_change);
+            const priceDisplay = formatPrice(item.price);
+            let ivClass = 'iv-low';
+            const gapIvRaw = parseFloat(item.implied_volatility);
+            const gapIvIlliquid = (gapIvRaw < 0);
+            const gapIv = gapIvIlliquid ? 0 : (gapIvRaw || 0);
+            const ivDisplay = gapIvIlliquid ? 'N/A' : gapIv.toFixed(1) + '%';
+            if (gapIv > 100) ivClass = 'iv-extreme';
+            else if (gapIv > 25) ivClass = 'iv-high';
+            const gapMagnitude = Math.abs(item.pct_change);
+            const ivFactor = Math.min(gapIv / 100, 1.5);
+            let probReversal = Math.min(gapMagnitude * 2 + ivFactor * 10, 95);
+            probReversal = Math.max(probReversal, 5);
+            const probDisplay = Math.round(probReversal) + '%';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="rank-col"></td>
+                <td class="ticker-col"><strong>${item.ticker}</strong></td>
+                <td class="pct-col ${pctClass}">${pctDisplay}</td>
+                <td class="dollar-col">${dollarDisplay}</td>
+                <td class="price-col">${priceDisplay}</td>
+                <td class="iv-col ${ivClass}">${ivDisplay}</td>
+                <td class="prob-col">${probDisplay}</td>
+                <td class="mcap-col">${item.market_cap}</td>
+                <td class="trade-plan-col">
+                    <a href="#" class="gap-trade-plan-link" data-ticker="${item.ticker}">Gap Trade Plan</a>
+                </td>
+            `;
+            return tr;
+        }
+
         function renderGapTables(gapData) {
-            // Render gap gainers
-            const gainersBody = document.getElementById("gapGainersBody");
-            if (gapData.gainers.length === 0) {
-                gainersBody.innerHTML = '<tr><td colspan="9" class="loading">No gap gainers data available</td></tr>';
-            } else {
-                gainersBody.innerHTML = '';
-                gapData.gainers.forEach(item => {
-                    const row = document.createElement('tr');
-                    
-                    // Format percentage with color
-                    const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
-                    const pctDisplay = item.pct_change >= 0 ? 
-                        `+${item.pct_change.toFixed(2)}%` : 
-                        `${item.pct_change.toFixed(2)}%`;
-                    
-                    // Format dollar change with commas and space
-                    const dollarDisplay = formatDollarChange(item.dollar_change);
-                    
-                    // Format price with commas
-                    const priceDisplay = formatPrice(item.price);
-                    
-                    // Format IV with color
-                    let ivClass = 'iv-neutral';
-                    let ivDisplay = item.implied_volatility.toFixed(1) + '%';
-                    if (item.implied_volatility > 100) {
-                        ivClass = 'iv-high-bold';
-                    } else if (item.implied_volatility > 25) {
-                        ivClass = 'iv-high';
-                    } else {
-                        ivClass = 'iv-low';
-                    }
-                    
-                    // Calculate probability of trend reversal for gainers
-                    // Higher positive gap = higher probability of reversal (profit taking)
-                    // Higher IV suggests more volatility and potential for reversal
-                    const gapMagnitude = Math.abs(item.pct_change);
-                    const ivFactor = Math.min(item.implied_volatility / 100, 1.5); // Cap at 150%
-                    let probReversal = Math.min(gapMagnitude * 2 + ivFactor * 10, 95); // Max 95%
-                    probReversal = Math.max(probReversal, 5); // Min 5%
-                    const probDisplay = Math.round(probReversal) + '%';
-                    
-                    row.innerHTML = `
-                        <td class="rank-col">${item.rank}</td>
-                        <td class="ticker-col"><strong>${item.ticker}</strong></td>
-                        <td class="pct-col ${pctClass}">${pctDisplay}</td>
-                        <td class="dollar-col">${dollarDisplay}</td>
-                        <td class="price-col">${priceDisplay}</td>
-                        <td class="iv-col ${ivClass}">${ivDisplay}</td>
-                        <td class="prob-col">${probDisplay}</td>
-                        <td class="mcap-col">${item.market_cap}</td>
-                        <td class="trade-plan-col">
-                            <a href="#" class="gap-trade-plan-link" data-ticker="${item.ticker}">Gap Trade Plan</a>
-                        </td>
-                    `;
-                    gainersBody.appendChild(row);
-                });
+            const body = document.getElementById('gapCombinedBody');
+            if (!body) return;
+            const merged = [...(gapData.gainers || []), ...(gapData.losers || [])];
+            merged.sort((a, b) => b.pct_change - a.pct_change);
+            if (merged.length === 0) {
+                body.innerHTML = '<tr><td colspan="9" class="loading">No gap data available</td></tr>';
+                return;
             }
-            
-            // Render gap losers
-            const losersBody = document.getElementById("gapLosersBody");
-            if (gapData.losers.length === 0) {
-                losersBody.innerHTML = '<tr><td colspan="9" class="loading">No gap losers data available</td></tr>';
-            } else {
-                losersBody.innerHTML = '';
-                gapData.losers.forEach(item => {
-                    const row = document.createElement('tr');
-                    
-                    // Format percentage with color
-                    const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
-                    const pctDisplay = item.pct_change >= 0 ? 
-                        `+${item.pct_change.toFixed(2)}%` : 
-                        `${item.pct_change.toFixed(2)}%`;
-                    
-                    // Format dollar change with commas and space
-                    const dollarDisplay = formatDollarChange(item.dollar_change);
-                    
-                    // Format price with commas
-                    const priceDisplay = formatPrice(item.price);
-                    
-                    // Format IV with color
-                    let ivClass = 'iv-neutral';
-                    let ivDisplay = item.implied_volatility.toFixed(1) + '%';
-                    if (item.implied_volatility > 100) {
-                        ivClass = 'iv-high-bold';
-                    } else if (item.implied_volatility > 25) {
-                        ivClass = 'iv-high';
-                    } else {
-                        ivClass = 'iv-low';
-                    }
-                    
-                    // Calculate probability of trend reversal for losers
-                    // Higher negative gap = higher probability of reversal (oversold bounce)
-                    // Higher IV suggests more volatility and potential for reversal
-                    const gapMagnitude = Math.abs(item.pct_change);
-                    const ivFactor = Math.min(item.implied_volatility / 100, 1.5); // Cap at 150%
-                    let probReversal = Math.min(gapMagnitude * 2 + ivFactor * 10, 95); // Max 95%
-                    probReversal = Math.max(probReversal, 5); // Min 5%
-                    const probDisplay = Math.round(probReversal) + '%';
-                    
-                    row.innerHTML = `
-                        <td class="rank-col">${item.rank}</td>
-                        <td class="ticker-col"><strong>${item.ticker}</strong></td>
-                        <td class="pct-col ${pctClass}">${pctDisplay}</td>
-                        <td class="dollar-col">${dollarDisplay}</td>
-                        <td class="price-col">${priceDisplay}</td>
-                        <td class="iv-col ${ivClass}">${ivDisplay}</td>
-                        <td class="prob-col">${probDisplay}</td>
-                        <td class="mcap-col">${item.market_cap}</td>
-                        <td class="trade-plan-col">
-                            <a href="#" class="gap-trade-plan-link" data-ticker="${item.ticker}">Gap Trade Plan</a>
-                        </td>
-                    `;
-                    losersBody.appendChild(row);
-                });
-            }
-            
-            // Add event listeners for gap trade plan links
+            body.innerHTML = '';
+            merged.forEach(item => body.appendChild(renderGapRow(item)));
             document.querySelectorAll('.gap-trade-plan-link').forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
-                    const ticker = this.dataset.ticker;
-                    showGapTradePlan(ticker, gapData.date);
+                    showGapTradePlan(this.dataset.ticker, gapData.date);
                 });
             });
         }
         
+        // ── Load intraday data ──
+        async function loadIntradayData(date) {
+            try {
+                const resp = await fetch(`/api/intraday/${date}`);
+                const data = await resp.json();
+                renderIntradayTable(data);
+                if (data.poll_ts) {
+                    const d = new Date(data.poll_ts * 1000);
+                    const slotLabel = data.slot ? ` (slot ${data.slot})` : '';
+                    const el = document.getElementById('intradayPollTime');
+                    if (el) el.textContent = `Last polled: ${d.toLocaleString()}${slotLabel}`;
+                }
+            } catch (error) {
+                const body = document.getElementById('intradayBody');
+                if (body) body.innerHTML = '<tr><td colspan="10" class="loading">Error loading intraday data</td></tr>';
+            }
+        }
+
+        function renderIntradayRow(item, date) {
+            const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
+            const pctDisplay = (item.pct_change >= 0 ? '+' : '') + item.pct_change.toFixed(2) + '%';
+            const dollarDisplay = formatDollarChange(item.dollar_change);
+            const priceDisplay = formatPrice(item.price);
+
+            const ivRaw = parseFloat(item.implied_volatility);
+            const ivIlliquid = (ivRaw < 0);
+            const iv = ivIlliquid ? 0 : (ivRaw || 0);
+            let ivClass = iv > 25 ? 'iv-high' : 'iv-low';
+            if (iv > 100) ivClass = 'iv-extreme';
+            const ivDisplay = ivIlliquid ? 'N/A' : (iv > 0 ? iv.toFixed(1) + '%' : '—');
+
+            const pc = parseFloat(item.put_call_ratio) || 0;
+            const pcClass = pc > 1.0 ? 'pc-bearish' : (pc > 0 && pc < 0.7 ? 'pc-bullish' : '');
+            const pcDisplay = pc > 0 ? pc.toFixed(2) : '—';
+
+            const si = parseFloat(item.short_pct) || 0;
+            const siClass = si >= 20 ? 'high-si' : si >= 10 ? 'med-si' : '';
+            const siDisplay = si > 0 ? si.toFixed(1) + '%' : '—';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="rank-col"></td>
+                <td class="ticker-col"><strong>${item.ticker}</strong></td>
+                <td class="pct-col ${pctClass}">${pctDisplay}</td>
+                <td class="dollar-col">${dollarDisplay}</td>
+                <td class="price-col">${priceDisplay}</td>
+                <td class="iv-col ${ivClass}">${ivDisplay}</td>
+                <td class="pc-col ${pcClass}">${pcDisplay}</td>
+                <td class="pct-col ${siClass}">${siDisplay}</td>
+                <td class="mcap-col">${item.market_cap || 'N/A'}</td>
+                <td class="trade-plan-col">
+                    <a href="#" class="intraday-trade-plan-link" data-ticker="${item.ticker}" data-date="${date}">Trade Plan</a>
+                </td>
+            `;
+            return tr;
+        }
+
+        function renderIntradayTable(data) {
+            const body = document.getElementById('intradayBody');
+            if (!body) return;
+            const merged = [...(data.gainers || []), ...(data.losers || [])];
+            merged.sort((a, b) => b.pct_change - a.pct_change);
+            if (merged.length === 0) {
+                body.innerHTML = '<tr><td colspan="10" class="loading">No intraday data available yet — polls at 9:45, 11:45, 14:45, 15:55 EDT</td></tr>';
+                return;
+            }
+            body.innerHTML = '';
+            merged.forEach(item => body.appendChild(renderIntradayRow(item, data.date)));
+            document.querySelectorAll('.intraday-trade-plan-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showIntradayTradePlan(this.dataset.ticker, this.dataset.date);
+                });
+            });
+        }
+
+        // ── Show intraday trade plan ──
+        async function showIntradayTradePlan(ticker, date) {
+            try {
+                const resp = await fetch(`/api/intraday-trade-plan/${ticker}/${date}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const plan = await resp.json();
+
+                document.getElementById('tradePlanTicker').textContent = `${ticker} - Intraday Analysis`;
+                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=5`;
+                setChartOverlayUrl(tvUrl);
+                const mobileChartLink = document.getElementById('mobileChartLink');
+                if (mobileChartLink) mobileChartLink.href = tvUrl;
+                const embedUrl = 'https://s.tradingview.com/widgetembed/?symbol=' + ticker + '&interval=5&range=1D&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en';
+                const iframe = document.getElementById('tradePlanChart');
+                if (iframe) iframe.src = embedUrl;
+
+                const ivDisp = plan.implied_volatility < 0 ? 'N/A' : (plan.implied_volatility > 0 ? plan.implied_volatility.toFixed(1) + '%' : '—');
+                document.getElementById('tradePlanContent').innerHTML = `
+                    <div class="plan-section">
+                        <h5>${plan.direction.charAt(0).toUpperCase() + plan.direction.slice(1)}: ${plan.move_description}</h5>
+                        <p>${plan.analysis}</p>
+                    </div>
+                    <div class="plan-section">
+                        <h5>Trade Parameters</h5>
+                        <ul>
+                            <li><strong>Entry:</strong> $${plan.entry.toFixed(2)}</li>
+                            <li><strong>Stop:</strong> $${plan.stop.toFixed(2)}</li>
+                            <li><strong>Target:</strong> $${plan.target.toFixed(2)}</li>
+                            <li><strong>Risk/Reward:</strong> ${plan.risk_reward}:1</li>
+                        </ul>
+                    </div>
+                    <div class="plan-section">
+                        <h5>Options &amp; Volatility</h5>
+                        <p>${plan.iv_analysis}</p>
+                        <p>IV: <strong>${ivDisp}</strong> | P/C: <strong>${plan.put_call_ratio > 0 ? plan.put_call_ratio.toFixed(2) : '—'}</strong></p>
+                    </div>
+                    ${plan.si_note ? `<div class="plan-section"><h5>Short Interest</h5><p>${plan.si_note}</p></div>` : ''}
+                    <div class="plan-section">
+                        <h5>Key Considerations</h5>
+                        <ul>
+                            <li>Monitor VWAP for continuation vs. reversal signals</li>
+                            <li>Volume confirmation is critical for intraday moves</li>
+                            <li>Watch overall market tone (SPY/QQQ momentum)</li>
+                            <li>${plan.implied_volatility < 0 ? 'IV data unavailable (illiquid options)' : plan.implied_volatility > 50 ? 'High IV — consider defined-risk strategies' : 'Options may provide good risk/reward'}</li>
+                        </ul>
+                    </div>
+                `;
+                document.getElementById('tradePlanPopup').style.display = 'flex';
+            } catch (err) {
+                alert(`Could not load trade plan for ${ticker}: ${err.message}`);
+            }
+        }
+
         // ── Show gap trade plan ──
         async function showGapTradePlan(ticker, date) {
             try {
@@ -460,7 +509,7 @@
                                 <li>Gaps often fill partially or completely - watch for fill levels</li>
                                 <li>Volume confirmation is key for gap continuation</li>
                                 <li>Consider market context (overall trend, sector performance)</li>
-                                <li>${plan.implied_volatility > 50 ? 'High IV suggests considering defined-risk options strategies' : 'Options may provide good risk/reward'}</li>
+                                <li>${plan.implied_volatility < 0 ? 'IV data unavailable (illiquid options)' : plan.implied_volatility > 50 ? 'High IV suggests considering defined-risk options strategies' : 'Options may provide good risk/reward'}</li>
                             </ul>
                         </div>
                         
@@ -521,12 +570,13 @@
                 const pcDisplay = pc > 0 ? pc.toFixed(2) : '—';
 
                 // IV color: green if under 25%, red if over 25%, bold if over 100%
-                const iv = parseFloat(row.implied_volatility) || 0;
-                console.log(`IV debug: ${row.ticker} = ${row.implied_volatility} -> parsed: ${iv}, type: ${typeof iv}`);
+                // Sentinel -1 means illiquid/capped (>300%)
+                const ivRaw = parseFloat(row.implied_volatility);
+                const ivIlliquid = (ivRaw < 0);
+                const iv = ivIlliquid ? 0 : (ivRaw || 0);
                 let ivClass = iv > 25 ? 'iv-high' : 'iv-low';
                 if (iv > 100) ivClass = 'iv-extreme';
-                console.log(`IV class for ${row.ticker}: ${ivClass}`);
-                const ivDisplay = iv > 0 ? iv.toFixed(2) + '%' : '—';
+                const ivDisplay = ivIlliquid ? 'N/A' : (iv > 0 ? iv.toFixed(2) + '%' : '—');
 
                 tr.innerHTML = `
                     <td class="rank-col">${i + 1}</td>
@@ -817,10 +867,13 @@
             const pcDisplay = pc > 0 ? pc.toFixed(2) : '—';
             
             // IV color: green if under 25%, red if over 25%, bold if over 100%
-            const iv = parseFloat(row.implied_volatility) || 0;
+            // Sentinel -1 means illiquid/capped (>300%)
+            const ivRaw2 = parseFloat(row.implied_volatility);
+            const ivIlliquid2 = (ivRaw2 < 0);
+            const iv = ivIlliquid2 ? 0 : (ivRaw2 || 0);
             let ivClass = iv > 25 ? 'iv-high' : 'iv-low';
             if (iv > 100) ivClass = 'iv-extreme';
-            const ivDisplay = iv > 0 ? iv.toFixed(2) + '%' : '—';
+            const ivDisplay = ivIlliquid2 ? 'N/A' : (iv > 0 ? iv.toFixed(2) + '%' : '—');
             
             tr.innerHTML = `
                 <td class="rank-col">1</td>

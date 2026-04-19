@@ -13,7 +13,7 @@
         "realm": "Short Interest Tracker",
         "users": {
             "admin": "changeme",
-            "traderjoe": "spy0DTE"
+            "admin2": "changeme2"
         }
     },
     "poll_schedule": {

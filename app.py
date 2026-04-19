@@ -19,6 +19,7 @@ from bs4 import BeautifulSoup
 from functools import wraps
 from flask import Flask, render_template, jsonify, send_from_directory, request, Response
 import re
+import pandas as pd
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from selenium import webdriver
@@ -129,6 +130,30 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_gap_losers_date ON gap_losers(poll_date)
     """)
     
+    # Intraday movers table (watchlist top 10 gainers + losers, 4x daily)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS intraday_movers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            pct_change REAL,
+            dollar_change REAL,
+            price REAL,
+            implied_volatility REAL,
+            market_cap TEXT,
+            short_pct REAL,
+            put_call_ratio REAL,
+            mover_type TEXT,
+            poll_date TEXT NOT NULL,
+            poll_ts INTEGER NOT NULL,
+            poll_slot TEXT NOT NULL,
+            rank INTEGER,
+            UNIQUE(ticker, poll_date, poll_slot, mover_type)
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_intraday_date ON intraday_movers(poll_date)
+    """)
+
     # Migrate: add put_call_ratio column if missing (existing DBs)
     try:
         conn.execute("SELECT put_call_ratio FROM short_interest LIMIT 1")
@@ -153,6 +178,7 @@ def prune_old_data():
     conn.execute("DELETE FROM short_interest WHERE poll_date < ?", (cutoff,))
     conn.execute("DELETE FROM gap_gainers WHERE poll_date < ?", (cutoff,))
     conn.execute("DELETE FROM gap_losers WHERE poll_date < ?", (cutoff,))
+    conn.execute("DELETE FROM intraday_movers WHERE poll_date < ?", (cutoff,))
     conn.commit()
     conn.close()
     # prune old chart images
@@ -322,26 +348,86 @@ def fetch_ticker_data(ticker):
         implied_volatility = 0.0
         try:
             import yfinance as yf
+            import time as _time
+            from datetime import datetime, timezone
             stock = yf.Ticker(ticker)
-            
-            # Get options chain for nearest expiration
+
+            MIN_OI = 50
+            MIN_VOL = 1
+            MIN_DTE = 20
+            IV_CAP = 300.0  # Cap displayed IV; mark above as illiquid
+
+            def _dte(expiry_str):
+                exp = datetime.strptime(expiry_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                now = datetime.now(timezone.utc)
+                return (exp - now).days
+
+            def _best_atm_iv(chain, current_price):
+                """Return blended ATM IV (call+put avg) for a chain with liquidity filter."""
+                for df in (chain.calls, chain.puts):
+                    df['strike_diff'] = abs(df['strike'] - current_price)
+
+                # Try strikes closest-to-ATM first, require liquidity
+                calls_sorted = chain.calls.sort_values('strike_diff')
+                puts_sorted  = chain.puts.sort_values('strike_diff')
+
+                call_iv = None
+                for _, row in calls_sorted.iterrows():
+                    oi  = row.get('openInterest', 0) or 0
+                    vol = row.get('volume', 0) or 0
+                    iv  = row.get('impliedVolatility', None)
+                    if oi >= MIN_OI and vol >= MIN_VOL and iv and iv > 0:
+                        call_iv = iv * 100
+                        break
+
+                put_iv = None
+                for _, row in puts_sorted.iterrows():
+                    oi  = row.get('openInterest', 0) or 0
+                    vol = row.get('volume', 0) or 0
+                    iv  = row.get('impliedVolatility', None)
+                    if oi >= MIN_OI and vol >= MIN_VOL and iv and iv > 0:
+                        put_iv = iv * 100
+                        break
+
+                if call_iv and put_iv:
+                    return (call_iv + put_iv) / 2
+                return call_iv or put_iv  # fallback to whichever we got
+
             options = stock.options
-            if options:
-                expiry = options[0]  # Nearest expiration
-                opt_chain = stock.option_chain(expiry)
-                
-                if not opt_chain.calls.empty and price > 0:
-                    # Find ATM call (closest to current price)
-                    opt_chain.calls['strike_diff'] = abs(opt_chain.calls['strike'] - price)
-                    nearest = opt_chain.calls.nsmallest(1, 'strike_diff')
-                    if not nearest.empty:
-                        iv = nearest.iloc[0]['impliedVolatility']
-                        if iv and iv > 0:
-                            implied_volatility = iv * 100  # Convert to percentage
-            
+            if options and price > 0:
+                # Prefer first expiration with DTE >= MIN_DTE; fall back to nearest
+                chosen_expiry = None
+                for exp in options:
+                    if _dte(exp) >= MIN_DTE:
+                        chosen_expiry = exp
+                        break
+                if chosen_expiry is None:
+                    chosen_expiry = options[0]  # last resort: nearest
+
+                opt_chain = stock.option_chain(chosen_expiry)
+                blended = _best_atm_iv(opt_chain, price)
+
+                # If liquid contract not found in chosen expiry, try next expirations
+                if blended is None:
+                    for exp in options:
+                        if exp == chosen_expiry:
+                            continue
+                        try:
+                            chain2 = stock.option_chain(exp)
+                            blended = _best_atm_iv(chain2, price)
+                            if blended is not None:
+                                break
+                        except Exception:
+                            continue
+
+                if blended is not None:
+                    if blended > IV_CAP:
+                        implied_volatility = -1.0  # sentinel: illiquid / capped
+                    else:
+                        implied_volatility = blended
+
             # Small delay to avoid rate limiting
-            import time
-            time.sleep(0.2)
+            _time.sleep(0.2)
         except Exception as e:
             log.warning(f"Failed to fetch IV for {ticker}: {e}")
 
@@ -358,6 +444,76 @@ def fetch_ticker_data(ticker):
     except Exception as e:
         log.error(f"Error fetching {ticker}: {e}")
         return None
+
+
+# ── Shared Robust IV Helper ─────────────────────────────────────────────
+
+def _fetch_robust_iv(ticker: str, price: float) -> float:
+    """
+    Fetch blended ATM (call+put) IV for `ticker` at `price`.
+    Returns -1.0 as sentinel when IV > 300% (illiquid/capped).
+    Returns 0.0 on failure or no data.
+    """
+    import yfinance as yf
+    import time as _time
+    from datetime import datetime, timezone
+
+    MIN_OI  = 50
+    MIN_VOL = 1
+    MIN_DTE = 20
+    IV_CAP  = 300.0
+
+    def _dte(expiry_str):
+        exp = datetime.strptime(expiry_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        return (exp - datetime.now(timezone.utc)).days
+
+    def _best_atm_iv(chain, cur_price):
+        for df in (chain.calls, chain.puts):
+            df['strike_diff'] = abs(df['strike'] - cur_price)
+        call_iv = put_iv = None
+        for _, row in chain.calls.sort_values('strike_diff').iterrows():
+            if (row.get('openInterest', 0) or 0) >= MIN_OI and \
+               (row.get('volume', 0) or 0) >= MIN_VOL and \
+               row.get('impliedVolatility') and row['impliedVolatility'] > 0:
+                call_iv = row['impliedVolatility'] * 100
+                break
+        for _, row in chain.puts.sort_values('strike_diff').iterrows():
+            if (row.get('openInterest', 0) or 0) >= MIN_OI and \
+               (row.get('volume', 0) or 0) >= MIN_VOL and \
+               row.get('impliedVolatility') and row['impliedVolatility'] > 0:
+                put_iv = row['impliedVolatility'] * 100
+                break
+        if call_iv and put_iv:
+            return (call_iv + put_iv) / 2
+        return call_iv or put_iv
+
+    try:
+        stock   = yf.Ticker(ticker)
+        options = stock.options
+        if not options or price <= 0:
+            return 0.0
+
+        chosen = next((e for e in options if _dte(e) >= MIN_DTE), options[0])
+        blended = _best_atm_iv(stock.option_chain(chosen), price)
+
+        if blended is None:
+            for exp in options:
+                if exp == chosen:
+                    continue
+                try:
+                    blended = _best_atm_iv(stock.option_chain(exp), price)
+                    if blended is not None:
+                        break
+                except Exception:
+                    continue
+
+        _time.sleep(0.2)
+        if blended is None:
+            return 0.0
+        return -1.0 if blended > IV_CAP else blended
+    except Exception as e:
+        log.warning(f"IV fetch failed for {ticker}: {e}")
+        return 0.0
 
 
 # ── Gap Data Collection ─────────────────────────────────────────────────
@@ -454,24 +610,8 @@ def fetch_gap_data():
                                         market_cap = cap_text
                                         break
                             
-                            # Get IV from yfinance
-                            implied_volatility = 0.0
-                            try:
-                                import yfinance as yf
-                                stock = yf.Ticker(ticker)
-                                options = stock.options
-                                if options:
-                                    exp = options[0]
-                                    opt_chain = stock.option_chain(exp)
-                                    calls = opt_chain.calls
-                                    if not calls.empty:
-                                        # Find ATM call
-                                        atm_call = calls.iloc[(calls['strike'] - price).abs().argsort()[:1]]
-                                        if not atm_call.empty:
-                                            implied_volatility = float(atm_call.iloc[0]['impliedVolatility']) * 100
-                                time.sleep(0.2)  # Rate limiting
-                            except Exception as e:
-                                log.warning(f"Could not get IV for {ticker}: {e}")
+                            # Get IV from yfinance (using shared robust helper)
+                            implied_volatility = _fetch_robust_iv(ticker, price)
                             
                             # Only add if we have valid data AND positive change (gap up)
                             if ticker and price > 0 and change_pct > 0:
@@ -537,23 +677,8 @@ def fetch_gap_data():
                                             market_cap = cap_text
                                             break
                                 
-                                # Get IV from yfinance
-                                implied_volatility = 0.0
-                                try:
-                                    import yfinance as yf
-                                    stock = yf.Ticker(ticker)
-                                    options = stock.options
-                                    if options:
-                                        exp = options[0]
-                                        opt_chain = stock.option_chain(exp)
-                                        calls = opt_chain.calls
-                                        if not calls.empty:
-                                            atm_call = calls.iloc[(calls['strike'] - price).abs().argsort()[:1]]
-                                            if not atm_call.empty:
-                                                implied_volatility = float(atm_call.iloc[0]['impliedVolatility']) * 100
-                                    time.sleep(0.2)  # Rate limiting
-                                except Exception as e:
-                                    log.warning(f"Could not get IV for {ticker}: {e}")
+                                # Get IV from yfinance (using shared robust helper)
+                                implied_volatility = _fetch_robust_iv(ticker, price)
                                 
                                 # Only add if we have valid data AND negative change (gap down)
                                 if ticker and price > 0 and change_pct < 0:
@@ -648,6 +773,162 @@ def poll_gap_data():
     conn.commit()
     conn.close()
     log.info(f"Stored {len(gap_gainers)} gap gainers and {len(gap_losers)} gap losers")
+
+
+# ── Intraday Movers ─────────────────────────────────────────────────────────
+
+def _intraday_slot() -> str:
+    """Label for the current poll slot."""
+    now = datetime.now(EST)
+    h, m = now.hour, now.minute
+    if h < 11:
+        return "945"
+    elif h < 14:
+        return "1145"
+    elif h < 15 or (h == 15 and m < 30):
+        return "1345"
+    else:
+        return "1555"
+
+
+def fetch_intraday_movers():
+    """
+    Fetch intraday % change for all watchlist tickers via yfinance.
+    Returns (gainers[:10], losers[:10]) sorted by pct_change desc/asc.
+    """
+    import yfinance as yf
+    results = []
+    log.info(f"Intraday poll: fetching {len(TICKERS)} tickers...")
+
+    try:
+        raw = yf.download(
+            TICKERS, period="2d", interval="1d",
+            auto_adjust=True, progress=False, threads=True,
+        )
+        closes      = raw["Close"].iloc[-1] if len(raw) >= 1 else None
+        prev_closes = raw["Close"].iloc[-2] if len(raw) >= 2 else None
+    except Exception as e:
+        log.warning(f"yfinance batch download failed: {e}")
+        closes = None
+        prev_closes = None
+
+    for ticker in TICKERS:
+        try:
+            price = prev_close = 0.0
+            if closes is not None and ticker in closes.index:
+                v = closes[ticker]
+                price = float(v) if not pd.isna(v) else 0.0
+            if prev_closes is not None and ticker in prev_closes.index:
+                v = prev_closes[ticker]
+                prev_close = float(v) if not pd.isna(v) else 0.0
+
+            if price <= 0 or prev_close <= 0:
+                info       = yf.Ticker(ticker).fast_info
+                price      = float(getattr(info, "last_price", 0) or 0)
+                prev_close = float(getattr(info, "previous_close", 0) or 0)
+
+            if price <= 0 or prev_close <= 0:
+                continue
+
+            dollar_change = price - prev_close
+            pct_change    = (dollar_change / prev_close) * 100
+
+            try:
+                mc = float(getattr(yf.Ticker(ticker).fast_info, "market_cap", 0) or 0)
+                if mc >= 1e12:
+                    market_cap = f"{mc/1e12:.2f}T"
+                elif mc >= 1e9:
+                    market_cap = f"{mc/1e9:.2f}B"
+                elif mc >= 1e6:
+                    market_cap = f"{mc/1e6:.2f}M"
+                else:
+                    market_cap = "N/A"
+            except Exception:
+                market_cap = "N/A"
+
+            iv = _fetch_robust_iv(ticker, price)
+
+            short_pct = put_call_ratio = 0.0
+            try:
+                fd = fetch_ticker_data(ticker)
+                if fd:
+                    short_pct      = fd.get("short_pct", 0.0)
+                    put_call_ratio = fd.get("put_call_ratio", 0.0)
+            except Exception:
+                pass
+
+            results.append({
+                "ticker":             ticker,
+                "pct_change":         round(pct_change, 2),
+                "dollar_change":      round(dollar_change, 4),
+                "price":              round(price, 2),
+                "implied_volatility": iv,
+                "market_cap":         market_cap,
+                "short_pct":          short_pct,
+                "put_call_ratio":     put_call_ratio,
+            })
+        except Exception as e:
+            log.warning(f"Intraday fetch failed for {ticker}: {e}")
+
+    results.sort(key=lambda x: x["pct_change"], reverse=True)
+    gainers = results[:10]
+    losers  = sorted(results, key=lambda x: x["pct_change"])[:10]
+    log.info(f"Intraday: {len(gainers)} gainers, {len(losers)} losers")
+    return gainers, losers
+
+
+def poll_intraday_movers():
+    """Fetch and store intraday movers (4x daily)."""
+    log.info("Starting intraday movers poll...")
+    today = datetime.now(EST).strftime("%Y-%m-%d")
+    ts    = int(time.time())
+    slot  = _intraday_slot()
+
+    gainers, losers = fetch_intraday_movers()
+    if not gainers and not losers:
+        log.warning("No intraday data — skipping DB write")
+        return
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "DELETE FROM intraday_movers WHERE poll_date = ? AND poll_slot = ?",
+        (today, slot)
+    )
+    for rank, item in enumerate(gainers, 1):
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO intraday_movers
+                (ticker,pct_change,dollar_change,price,implied_volatility,
+                 market_cap,short_pct,put_call_ratio,mover_type,
+                 poll_date,poll_ts,poll_slot,rank)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (
+                item["ticker"], item["pct_change"], item["dollar_change"],
+                item["price"], item["implied_volatility"], item["market_cap"],
+                item["short_pct"], item["put_call_ratio"], "gainer",
+                today, ts, slot, rank
+            ))
+        except Exception as e:
+            log.error(f"Intraday gainer DB error {item['ticker']}: {e}")
+    for rank, item in enumerate(losers, 1):
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO intraday_movers
+                (ticker,pct_change,dollar_change,price,implied_volatility,
+                 market_cap,short_pct,put_call_ratio,mover_type,
+                 poll_date,poll_ts,poll_slot,rank)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (
+                item["ticker"], item["pct_change"], item["dollar_change"],
+                item["price"], item["implied_volatility"], item["market_cap"],
+                item["short_pct"], item["put_call_ratio"], "loser",
+                today, ts, slot, rank
+            ))
+        except Exception as e:
+            log.error(f"Intraday loser DB error {item['ticker']}: {e}")
+    conn.commit()
+    conn.close()
+    log.info(f"Stored intraday slot={slot}: {len(gainers)} gainers, {len(losers)} losers")
 
 
 # ── Polling ─────────────────────────────────────────────────────────────
@@ -1231,8 +1512,10 @@ def api_gap_trade_plan(ticker, date):
             stop = price * 1.03
             target = price * 0.97
     
-    # Add IV analysis
-    if iv > 50:
+    # Add IV analysis (iv == -1 means illiquid/capped sentinel)
+    if iv < 0:
+        iv_analysis = "IV data unavailable (illiquid options or >300% — reading unreliable)."
+    elif iv > 50:
         iv_analysis = f"High IV ({iv:.1f}%) suggests elevated option premiums. Consider defined-risk strategies."
     elif iv > 25:
         iv_analysis = f"Moderate IV ({iv:.1f}%). Options fairly priced."
@@ -1258,6 +1541,157 @@ def api_gap_trade_plan(ticker, date):
     }
     
     return jsonify(trade_plan)
+
+
+
+@app.route("/api/intraday/<date>")
+def api_intraday_data(date):
+    """Return intraday movers for a given date (latest poll slot)."""
+    conn = sqlite3.connect(DB_PATH)
+    # Get the most recent slot for this date
+    slot_row = conn.execute(
+        "SELECT poll_slot FROM intraday_movers WHERE poll_date = ? ORDER BY poll_ts DESC LIMIT 1",
+        (date,)
+    ).fetchone()
+    slot = slot_row[0] if slot_row else None
+
+    poll_ts_row = conn.execute(
+        "SELECT poll_ts FROM intraday_movers WHERE poll_date = ? ORDER BY poll_ts DESC LIMIT 1",
+        (date,)
+    ).fetchone()
+    poll_ts = poll_ts_row[0] if poll_ts_row else None
+
+    gainers_rows = conn.execute("""
+        SELECT ticker, pct_change, dollar_change, price, implied_volatility,
+               market_cap, short_pct, put_call_ratio, rank
+        FROM intraday_movers
+        WHERE poll_date = ? AND mover_type = ? AND poll_slot = ?
+        ORDER BY pct_change DESC LIMIT 10
+    """, (date, "gainer", slot)).fetchall() if slot else []
+
+    losers_rows = conn.execute("""
+        SELECT ticker, pct_change, dollar_change, price, implied_volatility,
+               market_cap, short_pct, put_call_ratio, rank
+        FROM intraday_movers
+        WHERE poll_date = ? AND mover_type = ? AND poll_slot = ?
+        ORDER BY pct_change ASC LIMIT 10
+    """, (date, "loser", slot)).fetchall() if slot else []
+    conn.close()
+
+    def row_to_dict(r):
+        return {
+            "ticker": r[0], "pct_change": r[1], "dollar_change": r[2],
+            "price": r[3], "implied_volatility": r[4], "market_cap": r[5],
+            "short_pct": r[6], "put_call_ratio": r[7], "rank": r[8],
+        }
+
+    return jsonify({
+        "gainers":  [row_to_dict(r) for r in gainers_rows],
+        "losers":   [row_to_dict(r) for r in losers_rows],
+        "date":     date,
+        "slot":     slot,
+        "poll_ts":  poll_ts,
+    })
+
+
+@app.route("/api/intraday-trade-plan/<ticker>/<date>")
+def api_intraday_trade_plan(ticker, date):
+    """Generate a trade plan for an intraday mover."""
+    conn = sqlite3.connect(DB_PATH)
+    slot_row = conn.execute(
+        "SELECT poll_slot FROM intraday_movers WHERE poll_date = ? ORDER BY poll_ts DESC LIMIT 1",
+        (date,)
+    ).fetchone()
+    slot = slot_row[0] if slot_row else None
+
+    row = conn.execute("""
+        SELECT ticker, pct_change, dollar_change, price, implied_volatility,
+               market_cap, short_pct, put_call_ratio, mover_type
+        FROM intraday_movers
+        WHERE ticker = ? AND poll_date = ? AND poll_slot = ?
+        ORDER BY poll_ts DESC LIMIT 1
+    """, (ticker, date, slot)).fetchone() if slot else None
+    conn.close()
+
+    if not row:
+        return jsonify({"error": "Ticker not found in intraday data for this date"}), 404
+
+    ticker, pct_change, dollar_change, price, iv, market_cap, short_pct, put_call_ratio, mover_type = row
+
+    if mover_type == "gainer":
+        direction = "intraday gainer"
+        sentiment = "bullish"
+        move_desc = f"Up {abs(pct_change):.2f}% intraday (${abs(dollar_change):.2f})"
+        if pct_change > 5:
+            analysis = "Strong intraday surge. Watch for continuation above VWAP with volume."
+            entry  = price * 0.99
+            stop   = price * 0.94
+            target = price * 1.08
+        elif pct_change > 2:
+            analysis = "Moderate intraday gain. Look for pullback to VWAP as entry opportunity."
+            entry  = price * 0.985
+            stop   = price * 0.96
+            target = price * 1.06
+        else:
+            analysis = "Small intraday move. Wait for volume confirmation before entering."
+            entry  = price * 0.99
+            stop   = price * 0.97
+            target = price * 1.04
+    else:
+        direction = "intraday loser"
+        sentiment = "bearish"
+        move_desc = f"Down {abs(pct_change):.2f}% intraday (${abs(dollar_change):.2f})"
+        if pct_change < -5:
+            analysis = "Strong intraday selloff. Resistance at VWAP. Consider short on bounce."
+            entry  = price * 1.01
+            stop   = price * 1.06
+            target = price * 0.92
+        elif pct_change < -2:
+            analysis = "Moderate intraday decline. Watch for dead-cat bounce before continuation."
+            entry  = price * 1.015
+            stop   = price * 1.04
+            target = price * 0.94
+        else:
+            analysis = "Minor intraday dip. Wait for breakdown confirmation below support."
+            entry  = price * 1.01
+            stop   = price * 1.03
+            target = price * 0.97
+
+    if iv < 0:
+        iv_analysis = "IV data unavailable (illiquid options or >300% — reading unreliable)."
+    elif iv > 50:
+        iv_analysis = f"High IV ({iv:.1f}%) — elevated premiums. Consider defined-risk strategies."
+    elif iv > 25:
+        iv_analysis = f"Moderate IV ({iv:.1f}%). Options fairly priced."
+    else:
+        iv_analysis = f"Low IV ({iv:.1f}%). Options relatively cheap."
+
+    si_note = ""
+    if short_pct > 20:
+        si_note = f"High short interest ({short_pct:.1f}%) — squeeze risk elevated."
+    elif short_pct > 10:
+        si_note = f"Moderate short interest ({short_pct:.1f}%)."
+
+    return jsonify({
+        "ticker":           ticker,
+        "direction":        direction,
+        "sentiment":        sentiment,
+        "move_description": move_desc,
+        "analysis":         analysis,
+        "iv_analysis":      iv_analysis,
+        "si_note":          si_note,
+        "current_price":    price,
+        "pct_change":       pct_change,
+        "dollar_change":    dollar_change,
+        "implied_volatility": iv,
+        "market_cap":       market_cap,
+        "short_pct":        short_pct,
+        "put_call_ratio":   put_call_ratio,
+        "entry":   round(entry, 2),
+        "stop":    round(stop, 2),
+        "target":  round(target, 2),
+        "risk_reward": round(abs(target - entry) / abs(entry - stop), 2),
+    })
 
 
 # ── Scheduler (runs once in the gunicorn preload master process) ────────
@@ -1319,8 +1753,18 @@ def start_scheduler():
         name=f"Gap poll at {gap_hour}:{gap_minute:02d} EST ({gap_days})",
     )
     
+    # Schedule intraday movers polls: 9:45, 11:45, 14:45, 15:55 EDT (mon-fri)
+    intraday_slots = [(9, 45, "945"), (11, 45, "1145"), (14, 45, "1345"), (15, 55, "1555")]
+    for ih, im, islot in intraday_slots:
+        scheduler.add_job(
+            poll_intraday_movers,
+            CronTrigger(hour=ih, minute=im, day_of_week=days, timezone=EST),
+            id=f"intraday_{islot}",
+            name=f"Intraday movers at {ih}:{im:02d} EST ({days})",
+        )
+
     scheduler.start()
-    log.info(f"Scheduler set: short interest at {hours} EST, gap at {gap_hour}:{gap_minute:02d} EST, {days}")
+    log.info(f"Scheduler set: short interest at {hours} EST, gap at {gap_hour}:{gap_minute:02d} EST, intraday at 9:45/11:45/14:45/15:55 EST, {days}")
 
 
 # Start scheduler when module loads (gunicorn --preload calls this once)
