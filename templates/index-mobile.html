@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260416_0238">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260418_1348">
 </head>
 <body>
     <div class="container">
@@ -28,7 +28,7 @@
         <table id="siTable">
             <thead>
                 <tr>
-                    <th class="rank-col">#</th>
+                    <th class="rank-col"></th>
                     <th class="ticker-col">Ticker</th>
                     <th class="pct-col">Short %</th>
                     <th class="dollar-col">Short $</th>
@@ -44,18 +44,18 @@
             </tbody>
         </table>
         
-        <!-- Quick Lookup Form (minimal) -->
-        <div class="lookup-section">
+        <!-- Controls row: watchlist left, ticker lookup right -->
+        <div class="controls-row">
+            <button type="button" id="watchlistOpenBtn" class="lookup-btn">Edit Watchlist</button>
             <form id="tickerLookupForm" class="lookup-form">
                 <label for="customTicker" class="lookup-label">Ticker:</label>
-                <input 
-                    type="text" 
-                    id="customTicker" 
-                    placeholder="" 
-                    maxlength="5" 
+                <input
+                    type="text"
+                    id="customTicker"
+                    placeholder=""
+                    maxlength="5"
                     pattern="[A-Za-z0-9]{1,5}"
                     title="Invalid entry - enter proper ticker name"
-
                 >
                 <button type="submit" class="lookup-btn">Go</button>
                 <button type="button" id="resetLookup" class="reset-btn" style="display: none;">Back</button>
@@ -141,6 +141,27 @@
         </div>
     </div>
     <div class="popup-overlay" id="popupOverlay"></div>
+
+    <!-- Watchlist Manager Popup -->
+    <div class="watchlist-popup" id="watchlistPopup">
+        <div class="watchlist-popup-header">
+            <h3>Manage Watchlist</h3>
+            <button class="close-btn" id="closeWatchlist">&times;</button>
+        </div>
+        <div class="watchlist-popup-body">
+            <div class="watchlist-count" id="watchlistCount"></div>
+            <div class="watchlist-error" id="watchlistError"></div>
+            <ul class="watchlist-ticker-list" id="watchlistTickerList"></ul>
+            <div class="watchlist-add-row">
+                <input type="text" id="watchlistAddInput" placeholder="e.g. MSFT" maxlength="5" autocomplete="off" spellcheck="false">
+                <button type="button" class="watchlist-add-btn" id="watchlistAddBtn">Add</button>
+            </div>
+        </div>
+        <div class="watchlist-popup-footer">
+            <button type="button" class="watchlist-remove-btn" id="watchlistRemoveBtn">Remove Tickers</button>
+            <button type="button" class="watchlist-ok-btn" id="watchlistOkBtn">OK</button>
+        </div>
+    </div>
 
     <script>
         let currentViewDate = null;
@@ -740,6 +761,148 @@
             customTickerInput.setCustomValidity('');
         }, 100);
         
+        // ── Watchlist Manager ──
+        const TICKER_VALID_RE = /^[A-Z]{1,5}$/;
+        const MAX_TICKERS = 100;
+        let wlTickers = [];
+        let wlDirty = false;
+
+        function sanitizeTicker(raw) {
+            // Only uppercase alpha chars, max 5
+            return raw.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
+        }
+
+        function wlShowError(msg) {
+            const el = document.getElementById('watchlistError');
+            el.textContent = msg;
+            if (msg) setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 4000);
+        }
+
+        function wlRenderList() {
+            const ul = document.getElementById('watchlistTickerList');
+            ul.innerHTML = '';
+            wlTickers.forEach((ticker, idx) => {
+                const li = document.createElement('li');
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.dataset.idx = idx;
+                const span = document.createElement('span');
+                span.textContent = ticker;
+                li.appendChild(cb);
+                li.appendChild(span);
+                ul.appendChild(li);
+            });
+            document.getElementById('watchlistCount').textContent =
+                `${wlTickers.length} tickers${wlTickers.length >= MAX_TICKERS ? ' (max reached)' : ''}`;
+        }
+
+        async function wlOpen() {
+            try {
+                const resp = await fetch('/api/watchlist');
+                if (!resp.ok) throw new Error('Failed to load watchlist');
+                wlTickers = await resp.json();
+            } catch(e) {
+                wlTickers = [];
+                wlShowError('Could not load watchlist: ' + e.message);
+            }
+            wlDirty = false;
+            wlRenderList();
+            document.getElementById('watchlistPopup').classList.add('open');
+            document.getElementById('popupOverlay').style.display = 'block';
+        }
+
+        function wlClose() {
+            document.getElementById('watchlistPopup').classList.remove('open');
+            document.getElementById('popupOverlay').style.display = 'none';
+            document.getElementById('watchlistAddInput').value = '';
+            wlShowError('');
+        }
+
+        async function wlSave() {
+            try {
+                const resp = await fetch('/api/watchlist', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(wlTickers)
+                });
+                if (!resp.ok) throw new Error('Save failed');
+                wlDirty = false;
+            } catch(e) {
+                wlShowError('Could not save: ' + e.message);
+                return false;
+            }
+            return true;
+        }
+
+        document.getElementById('watchlistOpenBtn').addEventListener('click', wlOpen);
+        document.getElementById('closeWatchlist').addEventListener('click', wlClose);
+
+        document.getElementById('watchlistAddBtn').addEventListener('click', function() {
+            const raw = document.getElementById('watchlistAddInput').value;
+            const ticker = sanitizeTicker(raw);
+            if (!ticker || !TICKER_VALID_RE.test(ticker)) {
+                wlShowError('Enter a valid ticker (letters only, 1-5 chars)');
+                return;
+            }
+            if (wlTickers.length >= MAX_TICKERS) {
+                wlShowError('Maximum 100 tickers allowed');
+                return;
+            }
+            if (wlTickers.includes(ticker)) {
+                wlShowError(ticker + ' is already in the list');
+                return;
+            }
+            wlTickers.push(ticker);
+            wlTickers.sort();
+            wlDirty = true;
+            wlRenderList();
+            document.getElementById('watchlistAddInput').value = '';
+            wlShowError('');
+        });
+
+        document.getElementById('watchlistAddInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('watchlistAddBtn').click();
+            }
+            // Force uppercase as user types
+            setTimeout(() => { this.value = this.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 5); }, 0);
+        });
+
+        document.getElementById('watchlistAddInput').addEventListener('input', function() {
+            this.value = this.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 5);
+        });
+
+        document.getElementById('watchlistRemoveBtn').addEventListener('click', function() {
+            const checked = document.querySelectorAll('#watchlistTickerList input[type=checkbox]:checked');
+            if (checked.length === 0) {
+                wlShowError('Check tickers to remove first');
+                return;
+            }
+            const toRemove = new Set(Array.from(checked).map(cb => parseInt(cb.dataset.idx)));
+            wlTickers = wlTickers.filter((_, i) => !toRemove.has(i));
+            wlDirty = true;
+            wlRenderList();
+            wlShowError('');
+        });
+
+        document.getElementById('watchlistOkBtn').addEventListener('click', async function() {
+            if (wlDirty) {
+                const ok = await wlSave();
+                if (!ok) return;
+            }
+            wlClose();
+        });
+
+        // Unified overlay click handler
+        document.getElementById('popupOverlay').addEventListener('click', function() {
+            if (document.getElementById('watchlistPopup').classList.contains('open')) {
+                wlClose();
+            } else if (document.getElementById('tradePlanPopup').style.display === 'block') {
+                hideTradePlan();
+            }
+        });
+
         // ── Init ──
         loadDates();
     </script>
