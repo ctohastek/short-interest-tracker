@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260419_1120">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260419_1526">
 </head>
 <body>
     <div class="container">
@@ -166,7 +166,7 @@
             </div>
         </div>
         <div class="watchlist-popup-footer">
-            <button type="button" class="watchlist-remove-btn" id="watchlistRemoveBtn">Remove Tickers</button>
+            <button type="button" class="watchlist-remove-btn" id="watchlistRemoveBtn">Remove Checked Names</button>
             <button type="button" class="watchlist-ok-btn" id="watchlistOkBtn">OK</button>
         </div>
     </div>
@@ -219,15 +219,11 @@
                 const gapData = await resp.json();
                 renderGapTables(gapData);
                 
-                // Set poll time for gap tables (use same as main table)
-                const mainDataResp = await fetch(`/api/data/${date}`);
-                const mainData = await mainDataResp.json();
-                if (mainData.length > 0) {
-                    const ts = mainData[0].poll_ts;
-                    const d = new Date(ts * 1000);
-                    const timeStr = `Last polled: ${d.toLocaleString()}`;
+                // Set poll time from gap table's own poll_ts
+                if (gapData.poll_ts) {
+                    const d = new Date(gapData.poll_ts * 1000);
                     const el = document.getElementById('gapCombinedPollTime');
-                    if (el) el.textContent = timeStr;
+                    if (el) el.textContent = `Last polled: ${d.toLocaleString()}`;
                 }
             } catch (error) {
                 const body = document.getElementById('gapCombinedBody');

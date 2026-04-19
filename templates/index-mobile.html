@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260419_1120">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260419_1526">
 </head>
 <body>
     <div class="container">
@@ -114,7 +114,6 @@
 
         <footer>
             <p>Data sourced from <a href="https://finviz.com" target="_blank">Finviz</a> • Charts via <a href="https://tradingview.com" target="_blank">TradingView</a> widget</p>
-            <p class="footer-note">Click "Trade Plan" for technical analysis with integrated TradingView chart • Click chart for new TradingView window</p>
         </footer>
     </div>
 
@@ -153,7 +152,7 @@
             </div>
         </div>
         <div class="watchlist-popup-footer">
-            <button type="button" class="watchlist-remove-btn" id="watchlistRemoveBtn">Remove Tickers</button>
+            <button type="button" class="watchlist-remove-btn" id="watchlistRemoveBtn">Remove Checked Names</button>
             <button type="button" class="watchlist-ok-btn" id="watchlistOkBtn">OK</button>
         </div>
     </div>
@@ -204,10 +203,8 @@
                 const resp = await fetch(`/api/gap-data/${date}`);
                 const gapData = await resp.json();
                 renderGapTables(gapData);
-                const mainResp = await fetch(`/api/data/${date}`);
-                const mainData = await mainResp.json();
-                if (mainData.length > 0) {
-                    const d = new Date(mainData[0].poll_ts * 1000);
+                if (gapData.poll_ts) {
+                    const d = new Date(gapData.poll_ts * 1000);
                     const el = document.getElementById('gapCombinedPollTime');
                     if (el) el.textContent = `Last polled: ${d.toLocaleString()}`;
                 }

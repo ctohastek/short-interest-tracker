@@ -1,5 +1,5 @@
 /* ── Short Interest Tracker — Styles ── */
-/* v=20260419_1120 */
+/* v=20260419_1526 */
 
 :root {
     --bg: #fafbfc;
@@ -91,8 +91,8 @@ header h1 .header-icon {
     padding: 0.35rem 0.75rem;
     border: 1px solid var(--border);
     border-radius: 0;
-    background: var(--surface);
-    color: var(--text);
+    background: #84B7DB;
+    color: #000000;
     font-size: 0.82rem;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -100,15 +100,15 @@ header h1 .header-icon {
 }
 
 .date-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: var(--accent-light);
+    background: #6aa3cc;
+    border-color: #6aa3cc;
+    color: #000000;
 }
 
 .date-btn.active {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
+    background: #4a8ab5;
+    color: #ffffff;
+    border-color: #4a8ab5;
 }
 
 /* ── Meta Row ── */
@@ -193,7 +193,8 @@ tbody td {
 .pc-col     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
 .iv-col     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
 .mcap-col   { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-muted); padding: 0 8px; }
-.trade-plan-col { white-space: nowrap; text-align: center; padding: 0 8px; }
+.trade-plan-col { white-space: nowrap; text-align: right; padding: 0 8px; }
+thead .trade-plan-col { text-align: center; }
 
 .high-si    { color: var(--high-si); }
 .med-si     { color: var(--med-si); }
@@ -263,8 +264,8 @@ td.iv-extreme { color: #e53e3e !important; font-weight: 700 !important; }  /* re
 
 .lookup-btn, .reset-btn {
     padding: 0.4rem 0.8rem;
-    background: var(--accent);
-    color: white;
+    background: #84B7DB;
+    color: #000000;
     border: none;
     border-radius: 0;
     font-size: 0.85rem;
@@ -274,15 +275,15 @@ td.iv-extreme { color: #e53e3e !important; font-weight: 700 !important; }  /* re
 }
 
 .lookup-btn:hover, .reset-btn:hover {
-    background: #2c5282;
+    background: #6aa3cc;
 }
 
 .reset-btn {
-    background: var(--text-muted);
+    background: #84B7DB;
 }
 
 .reset-btn:hover {
-    background: #4a5568;
+    background: #6aa3cc;
 }
 
 .error-message {
@@ -640,13 +641,22 @@ footer a:hover {
 }
 
 .gap-subtitle {
-    color: var(--text-muted);
-    font-size: 0.9rem;  /* matches .subtitle */
+    color: var(--text);
+    font-size: 0.85rem;  /* matches header h1 */
+    font-weight: 700;
+    letter-spacing: -0.01em;
     text-align: left;
     margin-bottom: 0.75rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.gap-subtitle span {
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
 }
 
 .gap-table {
@@ -709,13 +719,15 @@ footer a:hover {
 .gap-table .rank-col { width: 3rem; text-align: center; color: var(--text-muted); font-weight: 500; padding: 0 8px; }
 .gap-table .ticker-col { width: 6rem; padding: 0 8px; text-align: left; }
 .gap-table .ticker-col strong { color: var(--text); letter-spacing: 0.02em; }
-.gap-table .pct-col { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; }
+.gap-table .pct-col { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; }
+.gap-table thead .pct-col { text-align: center; }
 .gap-table .dollar-col { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; width: 9rem; min-width: 9rem; }
 .gap-table .price-col { text-align: center; font-variant-numeric: tabular-nums; padding: 0 8px; }
 .gap-table .iv-col { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; width: 4rem; }
 .gap-table .prob-col { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; width: 5rem; }
 .gap-table .mcap-col { text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); padding: 0 8px; }
-.gap-table .trade-plan-col { white-space: nowrap; text-align: center; padding: 0 8px; }
+.gap-table .trade-plan-col { white-space: nowrap; text-align: right; padding: 0 8px; }
+.gap-table thead .trade-plan-col { text-align: center; }
 
 /* Gap table arrows */
 .gap-arrow {
@@ -747,8 +759,8 @@ footer a:hover {
 /* TradingView button */
 .tradingview-button {
     display: inline-block;
-    background: linear-gradient(135deg, #26a69a 0%, #1e88e5 100%);
-    color: white;
+    background: #84B7DB;
+    color: #000000;
     padding: 0.75rem 1.5rem;
     border-radius: 0;
     text-decoration: none;
@@ -759,7 +771,7 @@ footer a:hover {
 }
 
 .tradingview-button:hover {
-    background: linear-gradient(135deg, #1e88e5 0%, #26a69a 100%);
+    background: #6aa3cc;
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
@@ -935,8 +947,8 @@ footer a:hover {
 
 .watchlist-add-btn {
     padding: 0.35rem 0.7rem;
-    background: var(--accent);
-    color: white;
+    background: #84B7DB;
+    color: #000000;
     border: none;
     border-radius: 0;
     font-size: 0.85rem;
@@ -945,7 +957,7 @@ footer a:hover {
 }
 
 .watchlist-add-btn:hover {
-    background: #2c5282;
+    background: #6aa3cc;
 }
 
 .watchlist-popup-footer {
@@ -961,8 +973,8 @@ footer a:hover {
 
 .watchlist-remove-btn {
     padding: 0.35rem 0.75rem;
-    background: #e53e3e;
-    color: white;
+    background: #84B7DB;
+    color: #000000;
     border: none;
     border-radius: 0;
     font-size: 0.85rem;
@@ -971,13 +983,13 @@ footer a:hover {
 }
 
 .watchlist-remove-btn:hover {
-    background: #c53030;
+    background: #6aa3cc;
 }
 
 .watchlist-ok-btn {
     padding: 0.35rem 1rem;
-    background: #38a169;
-    color: white;
+    background: #84B7DB;
+    color: #000000;
     border: none;
     border-radius: 0;
     font-size: 0.85rem;
@@ -986,7 +998,7 @@ footer a:hover {
 }
 
 .watchlist-ok-btn:hover {
-    background: #276749;
+    background: #6aa3cc;
 }
 
 .watchlist-open-btn-UNUSED {

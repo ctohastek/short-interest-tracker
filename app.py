@@ -1402,8 +1402,20 @@ def api_gap_data(date):
         LIMIT 5
     """, (date,)).fetchall()
     
+    # Get actual gap poll timestamp from gap tables
+    pts_row = conn.execute(
+        "SELECT poll_ts FROM gap_gainers WHERE poll_date = ? ORDER BY poll_ts DESC LIMIT 1",
+        (date,)
+    ).fetchone()
+    if not pts_row:
+        pts_row = conn.execute(
+            "SELECT poll_ts FROM gap_losers WHERE poll_date = ? ORDER BY poll_ts DESC LIMIT 1",
+            (date,)
+        ).fetchone()
+    gap_poll_ts = pts_row[0] if pts_row else None
+
     conn.close()
-    
+
     gainers = []
     for row in gainers_rows:
         gainers.append({
@@ -1415,7 +1427,7 @@ def api_gap_data(date):
             "market_cap": row[5],
             "rank": row[6]
         })
-    
+
     losers = []
     for row in losers_rows:
         losers.append({
@@ -1427,11 +1439,12 @@ def api_gap_data(date):
             "market_cap": row[5],
             "rank": row[6]
         })
-    
+
     return jsonify({
         "gainers": gainers,
         "losers": losers,
-        "date": date
+        "date": date,
+        "poll_ts": gap_poll_ts,
     })
 
 
