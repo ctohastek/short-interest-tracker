@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260419_1526">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260419_1536">
 </head>
 <body>
     <div class="container">
@@ -75,6 +75,7 @@
                         <th class="rank-col"></th>
                         <th class="ticker-col">Ticker</th>
                         <th class="pct-col">%CHANGE</th>
+                        <th class="dollar-col">$CHANGE</th>
                         <th class="price-col">Price</th>
                         <th class="iv-col">IV</th>
                         <th class="prob-col">TREND REV</th>
@@ -82,7 +83,7 @@
                     </tr>
                 </thead>
                 <tbody id="gapCombinedBody">
-                    <tr><td colspan="7" class="loading">Loading gap data…</td></tr>
+                    <tr><td colspan="8" class="loading">Loading gap data…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -100,6 +101,7 @@
                         <th class="rank-col"></th>
                         <th class="ticker-col">Ticker</th>
                         <th class="pct-col">%CHG</th>
+                        <th class="dollar-col">$CHANGE</th>
                         <th class="price-col">Price</th>
                         <th class="iv-col">IV</th>
                         <th class="mcap-col">Mkt Cap</th>
@@ -107,7 +109,7 @@
                     </tr>
                 </thead>
                 <tbody id="intradayBody">
-                    <tr><td colspan="7" class="loading">Loading intraday data…</td></tr>
+                    <tr><td colspan="8" class="loading">Loading intraday data…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -198,6 +200,11 @@
         }
         
         // ── Load gap data (with poll time update) ──
+        function formatDollarChange(num) {
+            const abs = Math.abs(num).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            return num >= 0 ? `+ $${abs}` : `- $${abs}`;
+        }
+
         async function loadGapData(date) {
             try {
                 const resp = await fetch(`/api/gap-data/${date}`);
@@ -210,7 +217,7 @@
                 }
             } catch (error) {
                 const body = document.getElementById('gapCombinedBody');
-                if (body) body.innerHTML = '<tr><td colspan="7" class="loading">Error loading gap data</td></tr>';
+                if (body) body.innerHTML = '<tr><td colspan="8" class="loading">Error loading gap data</td></tr>';
             }
         }
 
@@ -235,6 +242,7 @@
                 <td class="rank-col"></td>
                 <td class="ticker-col"><strong>${item.ticker}</strong></td>
                 <td class="pct-col ${pctClass}">${pctDisplay}</td>
+                <td class="dollar-col">${formatDollarChange(item.dollar_change)}</td>
                 <td class="price-col">$${item.price.toFixed(2)}</td>
                 <td class="iv-col ${ivClass}">${ivDisplay}</td>
                 <td class="prob-col">${probDisplay}</td>
@@ -251,7 +259,7 @@
             const merged = [...(gapData.gainers || []), ...(gapData.losers || [])];
             merged.sort((a, b) => b.pct_change - a.pct_change);
             if (merged.length === 0) {
-                body.innerHTML = '<tr><td colspan="7" class="loading">No gap data available</td></tr>';
+                body.innerHTML = '<tr><td colspan="8" class="loading">No gap data available</td></tr>';
                 return;
             }
             body.innerHTML = '';
@@ -278,7 +286,7 @@
                 }
             } catch (e) {
                 const body = document.getElementById('intradayBody');
-                if (body) body.innerHTML = '<tr><td colspan="7" class="loading">Error loading intraday data</td></tr>';
+                if (body) body.innerHTML = '<tr><td colspan="8" class="loading">Error loading intraday data</td></tr>';
             }
         }
 
@@ -288,7 +296,7 @@
             const merged = [...(data.gainers || []), ...(data.losers || [])];
             merged.sort((a, b) => b.pct_change - a.pct_change);
             if (merged.length === 0) {
-                body.innerHTML = '<tr><td colspan="7" class="loading">No intraday data yet — polls at 9:45, 11:45, 14:45, 15:55 EDT</td></tr>';
+                body.innerHTML = '<tr><td colspan="8" class="loading">No intraday data yet — polls at 9:45, 11:45, 14:45, 15:55 EDT</td></tr>';
                 return;
             }
             body.innerHTML = '';
@@ -306,6 +314,7 @@
                     <td class="rank-col"></td>
                     <td class="ticker-col"><strong>${item.ticker}</strong></td>
                     <td class="pct-col ${pctClass}">${pctDisplay}</td>
+                    <td class="dollar-col">${formatDollarChange(item.dollar_change)}</td>
                     <td class="price-col">$${item.price.toFixed(2)}</td>
                     <td class="iv-col ${ivClass}">${ivDisplay}</td>
                     <td class="mcap-col">${item.market_cap || 'N/A'}</td>
