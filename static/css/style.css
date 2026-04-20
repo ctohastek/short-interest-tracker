@@ -1,5 +1,5 @@
 /* ── Short Interest Tracker — Styles ── */
-/* v=20260419_2132 */
+/* v=20260419_2151 */
 
 :root {
     --bg: #fafbfc;
@@ -84,7 +84,8 @@ header h1 .header-icon {
 .date-buttons {
     display: flex;
     gap: 0.35rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
 }
 
 .date-btn {
@@ -580,6 +581,8 @@ footer a:hover {
 @media (max-width: 640px) {
     .container { padding: 1rem; }
     header h1 { font-size: 1.3rem; }
+    .controls-row { justify-content: flex-end; }
+    .lookup-form { flex-wrap: nowrap; justify-content: flex-end; }
     thead th, tbody td { padding: 0.5rem 0.5rem; font-size: 0.85rem; }
     .mcap-col { display: none; }
     .trade-plan-link { font-size: 0.75rem; }
