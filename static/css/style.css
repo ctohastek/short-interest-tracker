@@ -1,5 +1,5 @@
 /* ── Short Interest Tracker — Styles ── */
-/* v=20260419_2207 */
+/* v=20260419_2214 */
 
 :root {
     --bg: #fafbfc;
@@ -86,6 +86,12 @@ header h1 .header-icon {
     gap: 0.35rem;
     flex-wrap: nowrap;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;       /* Firefox */
+    -ms-overflow-style: none;    /* IE/Edge */
+}
+.date-buttons::-webkit-scrollbar {
+    display: none;               /* Chrome/Safari/iOS */
 }
 
 .date-btn {
