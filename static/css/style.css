@@ -1,5 +1,5 @@
 /* ── Short Interest Tracker — Styles ── */
-/* v=20260419_2201 */
+/* v=20260419_2207 */
 
 :root {
     --bg: #fafbfc;
@@ -160,11 +160,13 @@ thead th {
     white-space: nowrap;
 }
 
-/* Center align P/C Ratio and IV headers */
+/* Explicit header alignments */
 thead th.pc-col,
-thead th.iv-col {
+thead th.iv-col,
+thead th.pct-col,
+thead th.trade-plan-col,
+thead th.rank-col {
     text-align: center;
-    font-weight: 600; /* Ensure bold */
 }
 
 tbody tr {
@@ -193,9 +195,10 @@ tbody td {
 .price-col  { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
 .pc-col     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
 .iv-col     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
-.mcap-col   { text-align: right; font-variant-numeric: tabular-nums; color: #000000; padding: 0 8px; }
-.trade-plan-col { white-space: nowrap; text-align: right; padding: 0 8px; }
-thead th.trade-plan-col { text-align: center; }
+.mcap-col        { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
+tbody td.mcap-col { color: #000000; }
+thead th.mcap-col { color: var(--text-muted); }
+.trade-plan-col  { white-space: nowrap; text-align: right; padding: 0 8px; }
 
 .high-si    { color: var(--high-si); }
 .med-si     { color: var(--med-si); }
@@ -673,13 +676,13 @@ footer a:hover {
 }
 
 .gap-table thead {
-    background: var(--accent-light);
+    background: #f1f5f9;
     border-bottom: 2px solid var(--border);
 }
 
+/* All gap table headers: same weight/size as main table */
 .gap-table th {
     padding: 0.7rem 8px;
-    text-align: center;
     font-weight: 700;
     font-size: 0.8rem;
     color: var(--text-muted);
@@ -687,23 +690,22 @@ footer a:hover {
     letter-spacing: 0.05em;
     border-bottom: 2px solid var(--border);
     white-space: nowrap;
+    text-align: center;  /* default center for headers */
 }
 
-/* Left align ticker column header */
-.gap-table th.ticker-col {
-    text-align: left;
-}
+.gap-table th.ticker-col { text-align: left; }
 
+/* Data cells default */
 .gap-table td {
     padding: 0.65rem 1rem;
     border-bottom: 1px solid #edf2f7;
-    font-size: 0.8rem;  /* Match main table font size */
-    text-align: center;
+    font-size: 0.8rem;
     vertical-align: middle;
     line-height: 1.2;
+    text-align: left;  /* default; overridden per-column below */
+    color: #000000;
 }
 
-/* Left align ticker column cells */
 .gap-table td.ticker-col {
     text-align: left;
     font-weight: 600;
@@ -717,22 +719,19 @@ footer a:hover {
     background: var(--accent-light);
 }
 
-/* Gap-specific column widths */
-/* Gap table column widths - match top table structure */
-.gap-table .rank-col { width: 3rem; text-align: center; color: var(--text-muted); font-weight: 500; padding: 0 8px; }
-.gap-table .ticker-col { width: 6rem; padding: 0 8px; text-align: left; }
+/* Gap table column rules — one authoritative rule per column, no overrides needed */
+.gap-table td.rank-col       { text-align: center; color: var(--text-muted); font-weight: 500; width: 3rem; padding: 0 8px; }
+.gap-table td.ticker-col     { text-align: left;   font-weight: 600; width: 6rem; padding: 0 8px; }
+.gap-table td.pct-col        { text-align: right;  font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; }
+.gap-table td.dollar-col     { text-align: right;  font-variant-numeric: tabular-nums; padding: 0 8px; width: 9rem; min-width: 9rem; }
+.gap-table td.price-col      { text-align: right;  font-variant-numeric: tabular-nums; padding: 0 8px; }
+.gap-table td.iv-col         { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; width: 4rem; }
+.gap-table td.prob-col       { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; width: 5rem; }
+.gap-table td.pc-col         { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
+.gap-table td.mcap-col       { text-align: right;  font-variant-numeric: tabular-nums; color: #000000; padding: 0 8px; }
+.gap-table td.trade-plan-col { text-align: right;  white-space: nowrap; padding: 0 8px; }
+.gap-table td.si-col         { text-align: right;  font-variant-numeric: tabular-nums; padding: 0 8px; }
 .gap-table .ticker-col strong { color: var(--text); letter-spacing: 0.02em; }
-.gap-table tbody .pct-col { text-align: right; }
-.gap-table thead th.pct-col { text-align: center; }
-.gap-table .pct-col { font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; }
-.gap-table .dollar-col { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; width: 9rem; min-width: 9rem; }
-.gap-table .price-col { text-align: center; font-variant-numeric: tabular-nums; padding: 0 8px; }
-.gap-table .iv-col { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; width: 4rem; }
-.gap-table .prob-col { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; width: 5rem; }
-.gap-table .mcap-col { text-align: center; font-variant-numeric: tabular-nums; color: #000000; padding: 0 8px; }
-.gap-table tbody .trade-plan-col { text-align: right; }
-.gap-table thead th.trade-plan-col { text-align: center; }
-.gap-table .trade-plan-col { white-space: nowrap; padding: 0 8px; }
 
 /* Gap table arrows */
 .gap-arrow {
