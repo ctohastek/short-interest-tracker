@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260419_2214">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260419_2222">
 </head>
 <body>
     <div class="container">
@@ -338,9 +338,9 @@
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const plan = await resp.json();
                 document.getElementById('tradePlanTicker').textContent = `${ticker} - Intraday`;
-                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=5`;
+                const tvUrl = `https://s.tradingview.com/widgetembed/?symbol=${ticker}&interval=5&theme=light&style=1&locale=en`;
                 const mobileChartLink = document.getElementById('mobileChartLink');
-                if (mobileChartLink) mobileChartLink.href = tvUrl;
+                if (mobileChartLink) { mobileChartLink.href = tvUrl; mobileChartLink.textContent = `Open ${ticker} Chart`; }
                 const ivDisp = plan.implied_volatility < 0 ? 'N/A' : (plan.implied_volatility > 0 ? plan.implied_volatility.toFixed(1) + '%' : '—');
                 document.getElementById('tradePlanContent').innerHTML = `
                     <div class="plan-section">
@@ -533,11 +533,11 @@
             tradePlanTicker.textContent = `${ticker} — Trade Plan`;
             
             // Set up TradingView link for mobile
-            const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=30`;
+            const tvUrl = `https://s.tradingview.com/widgetembed/?symbol=${ticker}&interval=30&theme=light&style=1&locale=en`;
             const mobileChartLink = document.getElementById('mobileChartLink');
             if (mobileChartLink) {
                 mobileChartLink.href = tvUrl;
-                mobileChartLink.textContent = `Open ${ticker} chart in TradingView`;
+                mobileChartLink.textContent = `Open ${ticker} Chart`;
             }
             
             // Show loading state
