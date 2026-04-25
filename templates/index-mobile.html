@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260419_2222">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260425_1610">
 </head>
 <body>
     <div class="container">
@@ -90,33 +90,26 @@
 
 
         <!-- Intraday Movers Table -->
-        <div class="gap-section" id="intradaySection">
+        <div class="gap-section intraday-section" id="intradaySection">
             <div class="gap-subtitle">
-                <span>Intraday Top Gainers &amp; Losers (Watchlist)</span>
-                <div class="gap-poll-time" id="intradayPollTime"></div>
+                <span>Intraday Gainers/Losers</span>
             </div>
-            <table class="gap-table" id="intradayTable">
+            <table class="gap-table intraday-table" id="intradayTable">
                 <thead>
                     <tr>
-                        <th class="rank-col"></th>
                         <th class="ticker-col">Ticker</th>
-                        <th class="pct-col">%CHG</th>
+                        <th class="pct-col">%CHANGE</th>
                         <th class="dollar-col">$CHANGE</th>
-                        <th class="price-col">Price</th>
-                        <th class="iv-col">IV</th>
-                        <th class="pc-col">P/C</th>
-                        <th class="mcap-col">Mkt Cap</th>
-                        <th class="trade-plan-col">Trade Plan</th>
                     </tr>
                 </thead>
                 <tbody id="intradayBody">
-                    <tr><td colspan="9" class="loading">Loading intraday data…</td></tr>
+                    <tr><td colspan="3" class="loading">Loading intraday data…</td></tr>
                 </tbody>
             </table>
         </div>
 
         <footer>
-            <p>Data sourced from <a href="https://finviz.com" target="_blank">Finviz</a>, <a href="https://pypi.org/project/yfinance/" target="_blank">yfinance</a> • Charts via <a href="https://tradingview.com" target="_blank">TradingView</a> widget</p>
+            <p>Data sourced from <a href="https://finviz.com" target="_blank">Finviz</a>, <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a>, <a href="https://pypi.org/project/yfinance/" target="_blank">yfinance</a> • Charts via <a href="https://tradingview.com" target="_blank">TradingView</a> widget</p>
         </footer>
     </div>
 
@@ -223,9 +216,10 @@
         }
 
         // ── Render merged gap table ──
-        function renderGapRow(item) {
+        function renderGapRow(item, gapDate) {
             const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
             const pctDisplay = (item.pct_change >= 0 ? '+' : '') + item.pct_change.toFixed(2) + '%';
+            const dollarClass = item.dollar_change >= 0 ? 'gap-up' : 'gap-down';
             let ivClass = 'iv-low';
             const gapIvRaw = parseFloat(item.implied_volatility);
             const gapIvIlliquid = (gapIvRaw < 0);
@@ -242,13 +236,13 @@
             tr.innerHTML = `
                 <td class="rank-col"></td>
                 <td class="ticker-col"><strong>${item.ticker}</strong></td>
-                <td class="pct-col ${pctClass}">${pctDisplay}</td>
-                <td class="dollar-col">${formatDollarChange(item.dollar_change)}</td>
+                <td class="pct-col ${pctClass}" style="font-weight:400">${pctDisplay}</td>
+                <td class="dollar-col ${dollarClass}">${formatDollarChange(item.dollar_change)}</td>
                 <td class="price-col">$${item.price.toFixed(2)}</td>
                 <td class="iv-col ${ivClass}">${ivDisplay}</td>
                 <td class="prob-col">${probDisplay}</td>
                 <td class="trade-plan-col">
-                    <a href="#" class="gap-trade-plan-link" data-ticker="${item.ticker}">Gap Trade Plan</a>
+                    <a href="#" class="gap-trade-plan-link" data-ticker="${item.ticker}" data-date="${gapDate}">Gap Trade Plan</a>
                 </td>
             `;
             return tr;
@@ -264,11 +258,12 @@
                 return;
             }
             body.innerHTML = '';
-            merged.forEach(item => body.appendChild(renderGapRow(item)));
+            const rows = merged.slice(0, 30);
+            rows.forEach(item => body.appendChild(renderGapRow(item, gapData.date)));
             document.querySelectorAll('.gap-trade-plan-link').forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
-                    showGapTradePlan(this.dataset.ticker, gapData.date);
+                    showGapTradePlan(this.dataset.ticker, this.dataset.date);
                 });
             });
         }
@@ -297,38 +292,24 @@
             const merged = [...(data.gainers || []), ...(data.losers || [])];
             merged.sort((a, b) => b.pct_change - a.pct_change);
             if (merged.length === 0) {
-                body.innerHTML = '<tr><td colspan="9" class="loading">No intraday data yet — polls at 9:45, 11:45, 14:45, 15:55 EDT</td></tr>';
+                body.innerHTML = '<tr><td colspan="3" class="loading">No intraday data yet — polls at 9:45, 11:45, 14:45, 15:55 EDT</td></tr>';
                 return;
             }
             body.innerHTML = '';
-            merged.forEach(item => {
-                const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
+            const rows = merged.slice(0, 40);
+            rows.forEach(item => {
+                const pctClass = item.pct_change >= 0 ? 'intraday-pos' : 'intraday-neg';
                 const pctDisplay = (item.pct_change >= 0 ? '+' : '') + item.pct_change.toFixed(2) + '%';
-                const ivRaw = parseFloat(item.implied_volatility);
-                const ivIlliquid = (ivRaw < 0);
-                const iv = ivIlliquid ? 0 : (ivRaw || 0);
-                let ivClass = iv > 25 ? 'iv-high' : 'iv-low';
-                if (iv > 100) ivClass = 'iv-extreme';
-                const ivDisplay = ivIlliquid ? 'N/A' : (iv > 0 ? iv.toFixed(1) + '%' : '—');
+                const dollarAbs = Math.abs(item.dollar_change).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                const dollarDisplay = (item.dollar_change >= 0 ? '+$' : '-$') + dollarAbs;
+                const dollarClass = item.dollar_change >= 0 ? 'intraday-pos' : 'intraday-neg';
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="rank-col"></td>
-                    <td class="ticker-col"><strong>${item.ticker}</strong></td>
-                    <td class="pct-col ${pctClass}">${pctDisplay}</td>
-                    <td class="dollar-col">${formatDollarChange(item.dollar_change)}</td>
-                    <td class="price-col">$${item.price.toFixed(2)}</td>
-                    <td class="iv-col ${ivClass}">${ivDisplay}</td>
-                    <td class="pc-col ${item.put_call_ratio > 1.0 ? 'pc-bearish' : item.put_call_ratio > 0 && item.put_call_ratio < 0.7 ? 'pc-bullish' : ''}">${item.put_call_ratio > 0 ? item.put_call_ratio.toFixed(2) : '—'}</td>
-                    <td class="mcap-col">${item.market_cap || 'N/A'}</td>
-                    <td class="trade-plan-col"><a href="#" class="intraday-trade-plan-link" data-ticker="${item.ticker}" data-date="${data.date}">Trade Plan</a></td>
+                    <td class="intraday-ticker-cell"><strong>${item.ticker}</strong></td>
+                    <td class="intraday-pct-cell ${pctClass}">${pctDisplay}</td>
+                    <td class="intraday-dollar-cell ${dollarClass}">${dollarDisplay}</td>
                 `;
                 body.appendChild(tr);
-            });
-            document.querySelectorAll('.intraday-trade-plan-link').forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    showIntradayTradePlan(this.dataset.ticker, this.dataset.date);
-                });
             });
         }
 
@@ -380,12 +361,10 @@
                 // Update popup content
                 document.getElementById('tradePlanTicker').textContent = `${ticker} - Gap Analysis`;
                 
-                // Set chart link
+                // Set chart link — 1H chart, clicking opens new tab
+                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=60`;
                 const mobileChartLink = document.getElementById('mobileChartLink');
-                const tvUrl = `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_${Date.now()}&symbol=${ticker}&interval=30&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=light&style=1&timezone=America%2FNew_York&studies_overrides={}&overrides={}&enabled_features=["header_widget"]&disabled_features=["use_localstorage_for_settings"]&locale=en&utm_source=hastek.net&utm_medium=widget&utm_campaign=chart&utm_term=${ticker}`;
-                
-                mobileChartLink.href = tvUrl;
-                mobileChartLink.textContent = `Open ${ticker} Chart`;
+                if (mobileChartLink) { mobileChartLink.href = tvUrl; mobileChartLink.textContent = `Open ${ticker} Chart`; }
                 
                 // Build analysis HTML
                 const analysisPane = document.getElementById('analysisPane');
@@ -532,12 +511,12 @@
             currentTradePlanTicker = ticker;
             tradePlanTicker.textContent = `${ticker} — Trade Plan`;
             
-            // Set up TradingView link for mobile
-            const tvUrl = `https://s.tradingview.com/widgetembed/?symbol=${ticker}&interval=30&theme=light&style=1&locale=en`;
+            // Set up TradingView link for mobile — 1H chart
+            const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=60`;
             const mobileChartLink = document.getElementById('mobileChartLink');
             if (mobileChartLink) {
                 mobileChartLink.href = tvUrl;
-                mobileChartLink.textContent = `Open ${ticker} Chart`;
+                mobileChartLink.textContent = `Open ${ticker} Chart (1H)`;
             }
             
             // Show loading state
@@ -569,9 +548,8 @@
         function hideTradePlan() {
             tradePlanPopup.style.display = 'none';
             popupOverlay.style.display = 'none';
-            // Clear chart to stop loading
-            tradePlanChart.src = '';
-            // Clear current ticker
+            // Clear chart if it exists
+            if (tradePlanChart) tradePlanChart.src = '';
             currentTradePlanTicker = null;
         }
 

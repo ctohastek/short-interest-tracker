@@ -518,206 +518,114 @@ def _fetch_robust_iv(ticker: str, price: float) -> float:
 
 # ── Gap Data Collection ─────────────────────────────────────────────────
 
+def _format_market_cap(mcap_val):
+    """Format raw market cap number into human-readable string."""
+    if not mcap_val or mcap_val <= 0:
+        return "N/A"
+    if mcap_val >= 1_000_000_000_000:
+        return f"{mcap_val / 1_000_000_000_000:.2f}T"
+    if mcap_val >= 1_000_000_000:
+        return f"{mcap_val / 1_000_000_000:.2f}B"
+    if mcap_val >= 1_000_000:
+        return f"{mcap_val / 1_000_000:.1f}M"
+    return f"{mcap_val:,.0f}"
+
+
+def _yahoo_screener(scr_id, count=100):
+    """Fetch quotes from Yahoo Finance predefined screener."""
+    url = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
+    params = {"scrIds": scr_id, "count": count}
+    headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
+    resp = requests.get(url, params=params, headers=headers, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+    return data["finance"]["result"][0].get("quotes", [])
+
+
 def fetch_gap_data():
-    """Fetch top gap gainers and losers from Finviz with market cap filter."""
-    log.info("Fetching gap data from Finviz...")
-    
-    # Finviz screener URLs - try different patterns
-    url_patterns = [
-        # Pattern 1: Price change filters (more reliable than gap filters)
-        {
-            "gainers": "https://finviz.com/screener.ashx?v=111&f=cap_midover,cap_midunder,geo_usa,sh_avgvol_o1000,sh_price_o5,ta_change_u5&s=-change",  # Change > 5%, sorted descending
-            "losers": "https://finviz.com/screener.ashx?v=111&f=cap_midover,cap_midunder,geo_usa,sh_avgvol_o1000,sh_price_o5,ta_change_d5&s=change"    # Change < -5%, sorted ascending
-        },
-        # Pattern 2: Original gap filters as fallback
-        {
-            "gainers": "https://finviz.com/screener.ashx?v=111&f=cap_midover,cap_midunder,geo_usa,sh_avgvol_o1000,sh_price_o5,ta_gap_u&s=-change",
-            "losers": "https://finviz.com/screener.ashx?v=111&f=cap_midover,cap_midunder,geo_usa,sh_avgvol_o1000,sh_price_o5,ta_gap_d&s=change"
-        },
-        # Pattern 3: Simple gap filters without market cap
-        {
-            "gainers": "https://finviz.com/screener.ashx?v=111&f=ta_gap_u&s=-change",
-            "losers": "https://finviz.com/screener.ashx?v=111&f=ta_gap_d&s=change"
-        }
-    ]
-    
+    """Fetch top gap gainers and losers from Yahoo Finance screener (10B-200B mkt cap)."""
+    log.info("Fetching gap data from Yahoo Finance...")
+
+    MIN_MCAP = 10e9
+    MAX_MCAP = 200e9
+    MAX_RESULTS = 30  # per side
+
     gap_gainers = []
     gap_losers = []
-    
-    for pattern_idx, urls in enumerate(url_patterns):
-        try:
-            log.info(f"Trying URL pattern {pattern_idx + 1}...")
-            
-            # Fetch gap gainers
-            resp = requests.get(urls["gainers"], headers=FINVIZ_HEADERS, timeout=30)
-            if resp.status_code != 200:
-                log.warning(f"Pattern {pattern_idx + 1} gainers: HTTP {resp.status_code}")
+
+    try:
+        # ── Gainers ──
+        quotes = _yahoo_screener("day_gainers", count=100)
+        for q in quotes:
+            mcap = q.get("marketCap") or 0
+            if mcap < MIN_MCAP or mcap > MAX_MCAP:
                 continue
-                
-            soup = BeautifulSoup(resp.text, "html.parser")
-            
-            # Try to find the screener table
-            table = soup.find("table", class_="screener_table")
-            if not table:
-                # Try alternative table class
-                table = soup.find("table", {"cellpadding": "3", "cellspacing": "1", "border": "0", "width": "100%"})
-            
-            if table:
-                # Find all rows in the table (skip header)
-                rows = table.find_all("tr")[1:]  # Skip header row
-                
-                for i, row in enumerate(rows):  # Process ALL rows to get true top gap stocks
-                    cells = row.find_all("td")
-                    if len(cells) >= 11:  # Need at least 11 cells for basic data
-                        try:
-                            ticker = cells[1].get_text(strip=True)
-                            
-                            # Skip if ticker is empty or not uppercase letters
-                            if not ticker or not ticker.isupper() or len(ticker) > 5:
-                                continue
-                                
-                            # Try to extract price (column index may vary)
-                            price = 0.0
-                            change_pct = 0.0
-                            change_dollar = 0.0
-                            market_cap = "N/A"
-                            
-                            # Try different column indices
-                            for price_idx in [8, 9, 10]:
-                                if price_idx < len(cells):
-                                    price_text = cells[price_idx].get_text(strip=True)
-                                    price = parse_price(price_text)
-                                    if price > 0:
-                                        break
-                            
-                            # Try to find change columns
-                            for change_idx in [9, 10, 11]:
-                                if change_idx < len(cells):
-                                    change_text = cells[change_idx].get_text(strip=True)
-                                    if "%" in change_text:
-                                        change_pct = parse_pct(change_text)
-                                        # Next column might be dollar change
-                                        if change_idx + 1 < len(cells):
-                                            dollar_text = cells[change_idx + 1].get_text(strip=True)
-                                            change_dollar = parse_float(dollar_text.replace("$", ""))
-                                        break
-                            
-                            # Try to find market cap
-                            for cap_idx in [5, 6, 7]:
-                                if cap_idx < len(cells):
-                                    cap_text = cells[cap_idx].get_text(strip=True)
-                                    if "B" in cap_text or "M" in cap_text or cap_text.replace(".", "").isdigit():
-                                        market_cap = cap_text
-                                        break
-                            
-                            # Get IV from yfinance (using shared robust helper)
-                            implied_volatility = _fetch_robust_iv(ticker, price)
-                            
-                            # Only add if we have valid data AND positive change (gap up)
-                            if ticker and price > 0 and change_pct > 0:
-                                gap_gainers.append({
-                                    "ticker": ticker,
-                                    "pct_change": change_pct,
-                                    "dollar_change": change_dollar,
-                                    "price": price,
-                                    "implied_volatility": implied_volatility,
-                                    "market_cap": market_cap,
-                                    "gap_type": "up"
-                                })
-                        except Exception as e:
-                            log.warning(f"Error parsing row {i}: {e}")
-                            continue
-            
-            # Fetch gap losers
-            resp = requests.get(urls["losers"], headers=FINVIZ_HEADERS, timeout=30)
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, "html.parser")
-                table = soup.find("table", class_="screener_table")
-                if not table:
-                    table = soup.find("table", {"cellpadding": "3", "cellspacing": "1", "border": "0", "width": "100%"})
-                
-                if table:
-                    rows = table.find_all("tr")[1:]  # Skip header row
-                    
-                    for i, row in enumerate(rows):  # Process ALL rows to get true top gap stocks
-                        cells = row.find_all("td")
-                        if len(cells) >= 11:
-                            try:
-                                ticker = cells[1].get_text(strip=True)
-                                
-                                if not ticker or not ticker.isupper() or len(ticker) > 5:
-                                    continue
-                                    
-                                price = 0.0
-                                change_pct = 0.0
-                                change_dollar = 0.0
-                                market_cap = "N/A"
-                                
-                                for price_idx in [8, 9, 10]:
-                                    if price_idx < len(cells):
-                                        price_text = cells[price_idx].get_text(strip=True)
-                                        price = parse_price(price_text)
-                                        if price > 0:
-                                            break
-                                
-                                for change_idx in [9, 10, 11]:
-                                    if change_idx < len(cells):
-                                        change_text = cells[change_idx].get_text(strip=True)
-                                        if "%" in change_text:
-                                            change_pct = parse_pct(change_text)
-                                            if change_idx + 1 < len(cells):
-                                                dollar_text = cells[change_idx + 1].get_text(strip=True)
-                                                change_dollar = parse_float(dollar_text.replace("$", ""))
-                                            break
-                                
-                                for cap_idx in [5, 6, 7]:
-                                    if cap_idx < len(cells):
-                                        cap_text = cells[cap_idx].get_text(strip=True)
-                                        if "B" in cap_text or "M" in cap_text or cap_text.replace(".", "").isdigit():
-                                            market_cap = cap_text
-                                            break
-                                
-                                # Get IV from yfinance (using shared robust helper)
-                                implied_volatility = _fetch_robust_iv(ticker, price)
-                                
-                                # Only add if we have valid data AND negative change (gap down)
-                                if ticker and price > 0 and change_pct < 0:
-                                    gap_losers.append({
-                                        "ticker": ticker,
-                                        "pct_change": change_pct,
-                                        "dollar_change": change_dollar,
-                                        "price": price,
-                                        "implied_volatility": implied_volatility,
-                                        "market_cap": market_cap,
-                                        "gap_type": "down"
-                                    })
-                            except Exception as e:
-                                log.warning(f"Error parsing loser row {i}: {e}")
-                                continue
-                
-            # If we found data with this pattern, break
-            if gap_gainers or gap_losers:
-                log.info(f"Pattern {pattern_idx + 1} successful")
+            ticker = q.get("symbol", "")
+            if not ticker or len(ticker) > 5:
+                continue
+            price = q.get("regularMarketPrice") or 0
+            pct = q.get("regularMarketChangePercent") or 0
+            dollar = q.get("regularMarketChange") or 0
+            if price <= 0 or pct <= 0:
+                continue
+
+            iv = _fetch_robust_iv(ticker, price)
+
+            gap_gainers.append({
+                "ticker": ticker,
+                "pct_change": round(pct, 4),
+                "dollar_change": round(dollar, 4),
+                "price": round(price, 2),
+                "implied_volatility": iv,
+                "market_cap": _format_market_cap(mcap),
+                "gap_type": "up",
+            })
+            if len(gap_gainers) >= MAX_RESULTS:
                 break
-                
-        except Exception as e:
-            log.warning(f"Error with pattern {pattern_idx + 1}: {e}")
-            continue
-    
-    # Sort by percentage change
-    # Gap gainers: sort by highest positive percentage (largest gap up)
-    # Gap losers: sort by most negative percentage (largest gap down)
+
+        # ── Losers ──
+        quotes = _yahoo_screener("day_losers", count=100)
+        for q in quotes:
+            mcap = q.get("marketCap") or 0
+            if mcap < MIN_MCAP or mcap > MAX_MCAP:
+                continue
+            ticker = q.get("symbol", "")
+            if not ticker or len(ticker) > 5:
+                continue
+            price = q.get("regularMarketPrice") or 0
+            pct = q.get("regularMarketChangePercent") or 0
+            dollar = q.get("regularMarketChange") or 0
+            if price <= 0 or pct >= 0:
+                continue
+
+            iv = _fetch_robust_iv(ticker, price)
+
+            gap_losers.append({
+                "ticker": ticker,
+                "pct_change": round(pct, 4),
+                "dollar_change": round(dollar, 4),
+                "price": round(price, 2),
+                "implied_volatility": iv,
+                "market_cap": _format_market_cap(mcap),
+                "gap_type": "down",
+            })
+            if len(gap_losers) >= MAX_RESULTS:
+                break
+
+    except Exception as e:
+        log.error(f"Yahoo Finance screener error: {e}")
+
+    # Sort: gainers desc, losers asc
     gap_gainers.sort(key=lambda x: x["pct_change"], reverse=True)
-    gap_losers.sort(key=lambda x: x["pct_change"])  # Ascending (most negative first)
-    
-    # Update ranks after sorting
-    for i, item in enumerate(gap_gainers[:5]):
+    gap_losers.sort(key=lambda x: x["pct_change"])
+
+    for i, item in enumerate(gap_gainers):
         item["rank"] = i + 1
-    for i, item in enumerate(gap_losers[:5]):
+    for i, item in enumerate(gap_losers):
         item["rank"] = i + 1
-    
-    log.info(f"Found {len(gap_gainers)} gap gainers and {len(gap_losers)} gap losers")
-    return gap_gainers[:5], gap_losers[:5]  # Return top 5 each
+
+    log.info(f"Found {len(gap_gainers)} gap gainers and {len(gap_losers)} gap losers (Yahoo Finance)")
+    return gap_gainers[:MAX_RESULTS], gap_losers[:MAX_RESULTS]
 
 
 def poll_gap_data():
@@ -794,7 +702,7 @@ def _intraday_slot() -> str:
 def fetch_intraday_movers():
     """
     Fetch intraday % change for all watchlist tickers via yfinance.
-    Returns (gainers[:10], losers[:10]) sorted by pct_change desc/asc.
+    Returns (gainers[:20], losers[:20]) sorted by pct_change desc/asc.
     """
     import yfinance as yf
     results = []
@@ -871,8 +779,8 @@ def fetch_intraday_movers():
             log.warning(f"Intraday fetch failed for {ticker}: {e}")
 
     results.sort(key=lambda x: x["pct_change"], reverse=True)
-    gainers = results[:10]
-    losers  = sorted(results, key=lambda x: x["pct_change"])[:10]
+    gainers = results[:20]
+    losers  = sorted(results, key=lambda x: x["pct_change"])[:20]
     log.info(f"Intraday: {len(gainers)} gainers, {len(losers)} losers")
     return gainers, losers
 
@@ -1389,7 +1297,7 @@ def api_gap_data(date):
         FROM gap_gainers
         WHERE poll_date = ?
         ORDER BY rank
-        LIMIT 5
+        LIMIT 30
     """, (date,)).fetchall()
     
     # Get gap losers
@@ -1399,7 +1307,7 @@ def api_gap_data(date):
         FROM gap_losers
         WHERE poll_date = ?
         ORDER BY rank
-        LIMIT 5
+        LIMIT 30
     """, (date,)).fetchall()
     
     # Get actual gap poll timestamp from gap tables
@@ -1579,7 +1487,7 @@ def api_intraday_data(date):
                market_cap, short_pct, put_call_ratio, rank
         FROM intraday_movers
         WHERE poll_date = ? AND mover_type = ? AND poll_slot = ?
-        ORDER BY pct_change DESC LIMIT 10
+        ORDER BY pct_change DESC LIMIT 20
     """, (date, "gainer", slot)).fetchall() if slot else []
 
     losers_rows = conn.execute("""
@@ -1587,7 +1495,7 @@ def api_intraday_data(date):
                market_cap, short_pct, put_call_ratio, rank
         FROM intraday_movers
         WHERE poll_date = ? AND mover_type = ? AND poll_slot = ?
-        ORDER BY pct_change ASC LIMIT 10
+        ORDER BY pct_change ASC LIMIT 20
     """, (date, "loser", slot)).fetchall() if slot else []
     conn.close()
 

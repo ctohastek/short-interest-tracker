@@ -1,5 +1,5 @@
 /* ── Short Interest Tracker — Styles ── */
-/* v=20260419_2222 */
+/* v=20260425_1610 */
 
 :root {
     --bg: #fafbfc;
@@ -35,10 +35,41 @@ body {
 }
 
 .container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem;
+    margin: 0;
+    padding: 2rem 45px;
+    box-sizing: border-box;
+    width: 100%;
 }
+
+/* ── Two-column page layout ── */
+.page-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    width: 100%;
+}
+
+.left-col {
+    width: 20%;
+    flex: 0 0 20%;
+    min-width: 120px;
+    max-width: 240px;
+}
+
+.right-col {
+    flex: 1;
+    min-width: 0;
+}
+
+.intraday-header {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    margin-bottom: 0.65rem;
+}
+
+
 
 /* ── Header ── */
 header {
@@ -71,6 +102,11 @@ header h1 .header-icon {
     gap: 0.75rem;
     margin-bottom: 1rem;
     flex-wrap: wrap;
+}
+
+/* Watchlist button in date nav (right-aligned) */
+.watchlist-nav-btn {
+    margin-left: auto;
 }
 
 .nav-label {
@@ -338,13 +374,14 @@ footer a:hover {
 /* ── Trade Plan Popup ── */
 .trade-plan-popup {
     display: none;
+    flex-direction: column;
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 1400px;
-    max-width: 98vw;
-    height: 92vh;  /* Increased to 92vh */
+    width: 96vw;
+    max-width: 1600px;
+    height: 92vh;
     max-height: 92vh;
     background: var(--surface);
     border-radius: 0;
@@ -392,22 +429,25 @@ footer a:hover {
 .trade-plan-content {
     padding: 0;
     overflow: hidden;
-    height: calc(92vh - 50px);  /* Changed from max-height to height */
+    flex: 1;
+    min-height: 0;
 }
 
 .trade-plan-layout {
     display: flex;
     height: 100%;
+    width: 100%;
 }
 
 .chart-pane {
-    flex: 0 0 70%;  /* Increased to 70% for 1400px popup */
+    flex: 0 0 70%;
     background: #f8fafc;
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     padding: 0;
     height: 100%;
+    min-width: 0;
 }
 
 .chart-container {
@@ -488,9 +528,10 @@ footer a:hover {
 }
 
 .analysis-pane {
-    flex: 0 0 30%;  /* Reduced to 30% for 1400px popup */
+    flex: 1;
     padding: 1.5rem;
     overflow-y: auto;
+    min-width: 0;
 }
 
 .loading-plan {
@@ -790,15 +831,15 @@ footer a:hover {
     transform: translateY(0);
 }
 
-/* Gap percentage colors */
+/* Gap percentage/dollar colors */
 .gap-up {
-    color: #10b981;  /* Green for positive */
-    font-weight: 600;
+    color: #10b981 !important;
+    font-weight: 400 !important;
 }
 
 .gap-down {
-    color: #ef4444;  /* Red for negative */
-    font-weight: 600;
+    color: #ef4444 !important;
+    font-weight: 400 !important;
 }
 
 /* Gap trade plan link - matches main table style */
@@ -832,6 +873,46 @@ footer a:hover {
     background: var(--accent-light);
     text-decoration: underline;
 }
+
+/* ── Intraday narrow table ── */
+.intraday-section {
+    width: 100%;
+}
+
+.intraday-table {
+    width: 100%;
+    font-size: 0.78rem;
+}
+
+.intraday-table thead th {
+    font-size: 0.72rem;
+    padding: 0.45rem 5px;
+    text-align: left;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    background: #f1f5f9;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+}
+
+.intraday-ticker-head { text-align: left; }
+.intraday-pct-head    { text-align: center; }
+.intraday-dollar-head { text-align: center; }
+
+.intraday-table td {
+    padding: 0.38rem 5px;
+    font-size: 0.78rem;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.intraday-ticker-cell  { text-align: left; }
+.intraday-pct-cell     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 400 !important; }
+.intraday-dollar-cell  { text-align: center; font-variant-numeric: tabular-nums; font-weight: 400 !important; }
+
+.intraday-pos { color: #10b981 !important; font-weight: 400 !important; }
+.intraday-neg { color: #ef4444 !important; font-weight: 400 !important; }
 
 /* Responsive gap tables */
 @media (max-width: 640px) {

@@ -4,10 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260419_2214">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260425_1610">
 </head>
 <body>
     <div class="container">
+        <!-- Two-column page layout -->
+        <div class="page-layout">
+
+        <!-- LEFT COLUMN: Intraday table -->
+        <div class="left-col">
+            <div class="intraday-header">Intraday Gainers/Losers</div>
+            <!-- Intraday Movers Table -->
+            <div class="gap-section intraday-section" id="intradaySection">
+                <table class="gap-table intraday-table" id="intradayTable">
+                    <thead>
+                        <tr>
+                            <th class="intraday-ticker-head">Ticker</th>
+                            <th class="intraday-pct-head">%CHG</th>
+                            <th class="intraday-dollar-head">$CHG</th>
+                        </tr>
+                    </thead>
+                    <tbody id="intradayBody">
+                        <tr><td colspan="3" class="loading">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: everything else -->
+        <div class="right-col">
         <header>
             <h1><span class="header-icon">📉</span> Short Interest Tracker</h1>
             <p class="subtitle">Top 12 highest short interest from watchlist</p>
@@ -18,6 +43,7 @@
             <div class="date-buttons" id="dateButtons">
                 <!-- filled by JS -->
             </div>
+            <button type="button" id="watchlistOpenBtn" class="lookup-btn watchlist-nav-btn">Edit Watchlist</button>
         </nav>
 
         <div class="meta-row" id="metaRow">
@@ -44,9 +70,8 @@
             </tbody>
         </table>
         
-        <!-- Controls row: watchlist left, ticker lookup right -->
+        <!-- Controls row: ticker lookup right -->
         <div class="controls-row">
-            <button type="button" id="watchlistOpenBtn" class="lookup-btn">Edit Watchlist</button>
             <form id="tickerLookupForm" class="lookup-form">
                 <label for="customTicker" class="lookup-label">Ticker:</label>
                 <input
@@ -90,36 +115,11 @@
         </div>
 
 
-        <!-- Intraday Movers Table -->
-        <div class="gap-section" id="intradaySection">
-            <div class="gap-subtitle">
-                <span>Intraday Top Gainers &amp; Losers (Watchlist)</span>
-                <div class="gap-poll-time" id="intradayPollTime"></div>
-            </div>
-            <table class="gap-table" id="intradayTable">
-                <thead>
-                    <tr>
-                        <th class="rank-col"></th>
-                        <th class="ticker-col">Ticker</th>
-                        <th class="pct-col">%CHANGE</th>
-                        <th class="dollar-col">$CHANGE</th>
-                        <th class="price-col">Price</th>
-                        <th class="iv-col">IV</th>
-                        <th class="pc-col">P/C</th>
-                        <th class="pct-col si-col">Short%</th>
-                        <th class="mcap-col">Mkt Cap</th>
-                        <th class="trade-plan-col">Trade Plan</th>
-                    </tr>
-                </thead>
-                <tbody id="intradayBody">
-                    <tr><td colspan="10" class="loading">Loading intraday data…</td></tr>
-                </tbody>
-            </table>
-        </div>
-
         <footer>
-            <p class="footer-note">Data sourced from <a href="https://finviz.com" target="_blank">Finviz</a>, <a href="https://pypi.org/project/yfinance/" target="_blank">yfinance</a> • Charts via <a href="https://tradingview.com" target="_blank">TradingView</a> widget</p>
+            <p class="footer-note">Data sourced from <a href="https://finviz.com" target="_blank">Finviz</a>, <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a>, <a href="https://pypi.org/project/yfinance/" target="_blank">yfinance</a> • Charts via <a href="https://tradingview.com" target="_blank">TradingView</a> widget</p>
         </footer>
+        </div><!-- end right-col -->
+        </div><!-- end page-layout -->
     </div>
 
     <!-- Trade Plan Popup with Chart -->
@@ -140,10 +140,6 @@
                 </div>
                 <div class="analysis-pane" id="analysisPane">
                     <div class="loading-plan">Loading trade plan...</div>
-                </div>
-                <!-- Mobile-only TradingView link (hidden on desktop) -->
-                <div class="mobile-tradingview-link" id="mobileTradingViewLink" style="display: none;">
-                    <a id="mobileChartLink" target="_blank" rel="noopener noreferrer">Click for Tradingview Chart</a>
                 </div>
             </div>
         </div>
@@ -251,7 +247,7 @@
         }
         
         // ── Render merged gap table (5 gainers + 5 losers, sorted by %CHANGE desc) ──
-        function renderGapRow(item) {
+        function renderGapRow(item, gapDate) {
             const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
             const pctDisplay = (item.pct_change >= 0 ? '+' : '') + item.pct_change.toFixed(2) + '%';
             const dollarDisplay = formatDollarChange(item.dollar_change);
@@ -268,18 +264,20 @@
             let probReversal = Math.min(gapMagnitude * 2 + ivFactor * 10, 95);
             probReversal = Math.max(probReversal, 5);
             const probDisplay = Math.round(probReversal) + '%';
+            // Color dollar change
+            const dollarClass = item.dollar_change >= 0 ? 'gap-up' : 'gap-down';
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="rank-col"></td>
                 <td class="ticker-col"><strong>${item.ticker}</strong></td>
-                <td class="pct-col ${pctClass}">${pctDisplay}</td>
-                <td class="dollar-col">${dollarDisplay}</td>
+                <td class="pct-col ${pctClass}" style="font-weight:400">${pctDisplay}</td>
+                <td class="dollar-col ${dollarClass}">${dollarDisplay}</td>
                 <td class="price-col">${priceDisplay}</td>
                 <td class="iv-col ${ivClass}">${ivDisplay}</td>
                 <td class="prob-col">${probDisplay}</td>
                 <td class="mcap-col">${item.market_cap}</td>
                 <td class="trade-plan-col">
-                    <a href="#" class="gap-trade-plan-link" data-ticker="${item.ticker}">Gap Trade Plan</a>
+                    <a href="#" class="gap-trade-plan-link" data-ticker="${item.ticker}" data-date="${gapDate}">Gap Trade Plan</a>
                 </td>
             `;
             return tr;
@@ -295,11 +293,12 @@
                 return;
             }
             body.innerHTML = '';
-            merged.forEach(item => body.appendChild(renderGapRow(item)));
+            const rows = merged.slice(0, 30);
+            rows.forEach(item => body.appendChild(renderGapRow(item, gapData.date)));
             document.querySelectorAll('.gap-trade-plan-link').forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
-                    showGapTradePlan(this.dataset.ticker, gapData.date);
+                    showGapTradePlan(this.dataset.ticker, this.dataset.date);
                 });
             });
         }
@@ -323,40 +322,17 @@
         }
 
         function renderIntradayRow(item, date) {
-            const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
+            const pctClass = item.pct_change >= 0 ? 'intraday-pos' : 'intraday-neg';
             const pctDisplay = (item.pct_change >= 0 ? '+' : '') + item.pct_change.toFixed(2) + '%';
-            const dollarDisplay = formatDollarChange(item.dollar_change);
-            const priceDisplay = formatPrice(item.price);
-
-            const ivRaw = parseFloat(item.implied_volatility);
-            const ivIlliquid = (ivRaw < 0);
-            const iv = ivIlliquid ? 0 : (ivRaw || 0);
-            let ivClass = iv > 25 ? 'iv-high' : 'iv-low';
-            if (iv > 100) ivClass = 'iv-extreme';
-            const ivDisplay = ivIlliquid ? 'N/A' : (iv > 0 ? iv.toFixed(1) + '%' : '—');
-
-            const pc = parseFloat(item.put_call_ratio) || 0;
-            const pcClass = pc > 1.0 ? 'pc-bearish' : (pc > 0 && pc < 0.7 ? 'pc-bullish' : '');
-            const pcDisplay = pc > 0 ? pc.toFixed(2) : '—';
-
-            const si = parseFloat(item.short_pct) || 0;
-            const siClass = si >= 20 ? 'high-si' : si >= 10 ? 'med-si' : '';
-            const siDisplay = si > 0 ? si.toFixed(1) + '%' : '—';
+            const dollarAbs = Math.abs(item.dollar_change).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const dollarDisplay = (item.dollar_change >= 0 ? '+$' : '-$') + dollarAbs;
+            const dollarClass = item.dollar_change >= 0 ? 'intraday-pos' : 'intraday-neg';
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="rank-col"></td>
-                <td class="ticker-col"><strong>${item.ticker}</strong></td>
-                <td class="pct-col ${pctClass}">${pctDisplay}</td>
-                <td class="dollar-col">${dollarDisplay}</td>
-                <td class="price-col">${priceDisplay}</td>
-                <td class="iv-col ${ivClass}">${ivDisplay}</td>
-                <td class="pc-col ${pcClass}">${pcDisplay}</td>
-                <td class="pct-col ${siClass}">${siDisplay}</td>
-                <td class="mcap-col">${item.market_cap || 'N/A'}</td>
-                <td class="trade-plan-col">
-                    <a href="#" class="intraday-trade-plan-link" data-ticker="${item.ticker}" data-date="${date}">Trade Plan</a>
-                </td>
+                <td class="intraday-ticker-cell"><strong>${item.ticker}</strong></td>
+                <td class="intraday-pct-cell ${pctClass}">${pctDisplay}</td>
+                <td class="intraday-dollar-cell ${dollarClass}">${dollarDisplay}</td>
             `;
             return tr;
         }
@@ -367,20 +343,15 @@
             const merged = [...(data.gainers || []), ...(data.losers || [])];
             merged.sort((a, b) => b.pct_change - a.pct_change);
             if (merged.length === 0) {
-                body.innerHTML = '<tr><td colspan="10" class="loading">No intraday data available yet — polls at 9:45, 11:45, 14:45, 15:55 EDT</td></tr>';
+                body.innerHTML = '<tr><td colspan="3" class="loading">No intraday data available yet — polls at 9:45, 11:45, 14:45, 15:55 EDT</td></tr>';
                 return;
             }
             body.innerHTML = '';
-            merged.forEach(item => body.appendChild(renderIntradayRow(item, data.date)));
-            document.querySelectorAll('.intraday-trade-plan-link').forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    showIntradayTradePlan(this.dataset.ticker, this.dataset.date);
-                });
-            });
+            const rows = merged.slice(0, 40);
+            rows.forEach(item => body.appendChild(renderIntradayRow(item, data.date)));
         }
 
-        // ── Show intraday trade plan ──
+        // ── Show intraday trade plan (unused in simplified intraday table) ──
         async function showIntradayTradePlan(ticker, date) {
             try {
                 const resp = await fetch(`/api/intraday-trade-plan/${ticker}/${date}`);
@@ -445,16 +416,14 @@
                 // Update popup content
                 document.getElementById('tradePlanTicker').textContent = `${ticker} - Gap Analysis`;
                 
-                // Set chart link
-                const mobileChartLink = document.getElementById('mobileChartLink');
-                // For gap analysis, use 15-minute timeframe
-                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=15`;
+                // Set chart link — 1H TradingView, click opens new tab
+                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=60`;
                 setChartOverlayUrl(tvUrl);
-                mobileChartLink.href = tvUrl;
                 
-                // Update iframe src
-                const embedUrl = 'https://s.tradingview.com/widgetembed/?symbol=' + ticker + '&interval=15&range=1D&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en';
-                document.getElementById('tradePlanChart').src = embedUrl;
+                // Embed 1H chart in iframe
+                const embedUrl = 'https://s.tradingview.com/widgetembed/?symbol=' + ticker + '&interval=60&range=1D&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en';
+                const iframe = document.getElementById('tradePlanChart');
+                if (iframe) iframe.src = embedUrl;
                 
                 // Build analysis HTML
                 const analysisPane = document.getElementById('analysisPane');
@@ -514,17 +483,8 @@
                 `;
                 
                 // Show popup
-                document.getElementById('tradePlanPopup').style.display = 'block';
+                document.getElementById('tradePlanPopup').style.display = 'flex';
                 document.getElementById('popupOverlay').style.display = 'block';
-                
-                // Show/hide mobile chart link
-                if (window.innerWidth <= 640) {
-                    document.getElementById('mobileTradingViewLink').style.display = 'block';
-                    document.getElementById('chartPane').style.display = 'none';
-                } else {
-                    document.getElementById('mobileTradingViewLink').style.display = 'none';
-                    document.getElementById('chartPane').style.display = 'block';
-                }
                 
             } catch (error) {
                 console.error("Error loading gap trade plan:", error);
@@ -634,35 +594,16 @@
             currentTradePlanTicker = ticker;
             tradePlanTicker.textContent = `${ticker} — Trade Plan`;
             
-            // Check if we're on mobile
-            const isMobile = window.innerWidth <= 640;
-            const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=D`;
-            
-            if (!isMobile) {
-                // Desktop: show chart
-                const chartUrl = 'https://s.tradingview.com/widgetembed/?symbol=' + ticker + '&interval=D&range=1M&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en';
-                tradePlanChart.src = chartUrl;
-                tradePlanChart.dataset.ticker = ticker;
-                setChartOverlayUrl(tvUrl);
-                
-                // Show chart pane, hide mobile link
-                document.getElementById('chartPane').style.display = 'flex';
-                document.getElementById('mobileTradingViewLink').style.display = 'none';
-            } else {
-                // Mobile: hide chart, show mobile link
-                document.getElementById('chartPane').style.display = 'none';
-                const mobileLink = document.getElementById('mobileTradingViewLink');
-                mobileLink.style.display = 'block';
-                
-                const mobileChartLink = document.getElementById('mobileChartLink');
-                mobileChartLink.href = tvUrl;
-                mobileChartLink.textContent = `Click for TradingView Chart - ${ticker}`;
-                mobileChartLink.title = `Open ${ticker} chart in TradingView`;
-            }
+            // Set up chart: 1D embed, click opens 1H TV
+            const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=60`;
+            const chartUrl = 'https://s.tradingview.com/widgetembed/?symbol=' + ticker + '&interval=D&range=1M&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en';
+            tradePlanChart.src = chartUrl;
+            tradePlanChart.dataset.ticker = ticker;
+            setChartOverlayUrl(tvUrl);
             
             // Show loading state
             analysisPane.innerHTML = '<div class="loading-plan">Loading trade plan...</div>';
-            tradePlanPopup.style.display = 'block';
+            tradePlanPopup.style.display = 'flex';
             popupOverlay.style.display = 'block';
             
             // Fetch trade plan from API
