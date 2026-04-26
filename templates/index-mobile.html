@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260425_1610">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260426_2355">
 </head>
 <body>
     <div class="container">
@@ -77,13 +77,14 @@
                         <th class="pct-col">%CHANGE</th>
                         <th class="dollar-col">$CHANGE</th>
                         <th class="price-col">Price</th>
+                        <th class="sector-col">Sector</th>
                         <th class="iv-col">IV</th>
                         <th class="prob-col">TREND REV</th>
                         <th class="trade-plan-col">Trade Plan</th>
                     </tr>
                 </thead>
                 <tbody id="gapCombinedBody">
-                    <tr><td colspan="8" class="loading">Loading gap data…</td></tr>
+                    <tr><td colspan="9" class="loading">Loading gap data…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -109,7 +110,7 @@
         </div>
 
         <footer>
-            <p>Data sourced from <a href="https://finviz.com" target="_blank">Finviz</a>, <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a>, <a href="https://pypi.org/project/yfinance/" target="_blank">yfinance</a> • Charts via <a href="https://tradingview.com" target="_blank">TradingView</a> widget</p>
+            <p>Data sourced from <a href="https://finviz.com" target="_blank">Finviz</a>, <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a> • Charts via <a href="https://tradingview.com" target="_blank">TradingView</a> widget</p>
         </footer>
     </div>
 
@@ -239,6 +240,7 @@
                 <td class="pct-col ${pctClass}" style="font-weight:400">${pctDisplay}</td>
                 <td class="dollar-col ${dollarClass}">${formatDollarChange(item.dollar_change)}</td>
                 <td class="price-col">$${item.price.toFixed(2)}</td>
+                <td class="sector-col">${item.sector || ''}</td>
                 <td class="iv-col ${ivClass}">${ivDisplay}</td>
                 <td class="prob-col">${probDisplay}</td>
                 <td class="trade-plan-col">
@@ -254,7 +256,7 @@
             const merged = [...(gapData.gainers || []), ...(gapData.losers || [])];
             merged.sort((a, b) => b.pct_change - a.pct_change);
             if (merged.length === 0) {
-                body.innerHTML = '<tr><td colspan="8" class="loading">No gap data available</td></tr>';
+                body.innerHTML = '<tr><td colspan="9" class="loading">No gap data available</td></tr>';
                 return;
             }
             body.innerHTML = '';
@@ -304,11 +306,15 @@
                 const dollarDisplay = (item.dollar_change >= 0 ? '+$' : '-$') + dollarAbs;
                 const dollarClass = item.dollar_change >= 0 ? 'intraday-pos' : 'intraday-neg';
                 const tr = document.createElement('tr');
+                tr.style.cursor = 'pointer';
                 tr.innerHTML = `
                     <td class="intraday-ticker-cell"><strong>${item.ticker}</strong></td>
                     <td class="intraday-pct-cell ${pctClass}">${pctDisplay}</td>
                     <td class="intraday-dollar-cell ${dollarClass}">${dollarDisplay}</td>
                 `;
+                tr.addEventListener('click', () => {
+                    window.open(`https://www.tradingview.com/chart/?symbol=${item.ticker}&interval=60`, '_blank', 'noopener,noreferrer');
+                });
                 body.appendChild(tr);
             });
         }

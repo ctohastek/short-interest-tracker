@@ -1,5 +1,5 @@
 /* ── Short Interest Tracker — Styles ── */
-/* v=20260425_1610 */
+/* v=20260426_2355 */
 
 :root {
     --bg: #fafbfc;
@@ -66,7 +66,7 @@ body {
     font-weight: 700;
     color: var(--text);
     letter-spacing: -0.01em;
-    margin-bottom: 0.65rem;
+    margin-bottom: 0.25rem;
 }
 
 
@@ -191,7 +191,7 @@ thead {
 }
 
 thead th {
-    padding: 0.7rem 8px;
+    padding: 0.5rem 8px;
     text-align: left;
     font-size: 0.8rem;  /* Scaled up from 0.75rem */
     font-weight: 700;
@@ -263,7 +263,7 @@ td.iv-extreme { color: #e53e3e !important; font-weight: 700 !important; }  /* re
 .controls-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     margin: 1.25rem 0 1rem;
     gap: 0.5rem;
     flex-wrap: wrap;
@@ -630,9 +630,10 @@ footer a:hover {
 /* ── Responsive ── */
 @media (max-width: 640px) {
     .container { padding: 1rem; }
-    header h1 { font-size: 1.3rem; }
-    .controls-row { justify-content: flex-end; }
+    header h1 { font-size: 0.85rem; }
+    .controls-row { justify-content: space-between; }
     .lookup-form { flex-wrap: nowrap; justify-content: flex-end; }
+    footer { text-align: center; width: 100%; }
     thead th, tbody td { padding: 0.5rem 0.5rem; font-size: 0.85rem; }
     .mcap-col { display: none; }
     .trade-plan-link { font-size: 0.75rem; }
@@ -729,7 +730,7 @@ footer a:hover {
 
 /* All gap table headers: same weight/size as main table */
 .gap-table th {
-    padding: 0.7rem 8px;
+    padding: 0.5rem 8px;
     font-weight: 700;
     font-size: 0.8rem;
     color: var(--text-muted);
@@ -774,6 +775,7 @@ footer a:hover {
 .gap-table td.price-col      { text-align: right;  font-variant-numeric: tabular-nums; padding: 0 8px; }
 .gap-table td.iv-col         { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; width: 4rem; }
 .gap-table td.prob-col       { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; width: 5rem; }
+.sector-col     { text-align: center; padding: 0 8px; width: 5.5rem; white-space: nowrap; }
 .gap-table td.pc-col         { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
 .gap-table td.mcap-col       { text-align: right;  font-variant-numeric: tabular-nums; color: #000000; padding: 0 8px; }
 .gap-table td.trade-plan-col { text-align: right;  white-space: nowrap; padding: 0 8px; }
@@ -877,6 +879,7 @@ footer a:hover {
 /* ── Intraday narrow table ── */
 .intraday-section {
     width: 100%;
+    margin-top: 0.25rem;  /* override gap-section's 2.5rem */
 }
 
 .intraday-table {
@@ -885,12 +888,12 @@ footer a:hover {
 }
 
 .intraday-table thead th {
-    font-size: 0.72rem;
-    padding: 0.45rem 5px;
+    font-size: 0.8rem;
+    padding: 0.5rem 8px;
     text-align: left;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     color: var(--text-muted);
     background: #f1f5f9;
     border-bottom: 2px solid var(--border);
@@ -913,6 +916,15 @@ footer a:hover {
 
 .intraday-pos { color: #10b981 !important; font-weight: 400 !important; }
 .intraday-neg { color: #ef4444 !important; font-weight: 400 !important; }
+
+/* Desktop-only: gap table column centering */
+@media (min-width: 641px) {
+    .gap-table td.pct-col    { text-align: center; }
+    .gap-table td.dollar-col { text-align: center; }
+    .gap-table td.price-col  { text-align: center; }
+    .gap-table td.mcap-col   { text-align: center; }
+    .gap-table th.trade-plan-col { text-align: right; }
+}
 
 /* Responsive gap tables */
 @media (max-width: 640px) {

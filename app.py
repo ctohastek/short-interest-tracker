@@ -167,7 +167,19 @@ def init_db():
     except sqlite3.OperationalError:
         log.info("Migrating DB: adding implied_volatility column...")
         conn.execute("ALTER TABLE short_interest ADD COLUMN implied_volatility REAL")
-    
+
+    # Migrate: add sector column to gap tables if missing
+    try:
+        conn.execute("SELECT sector FROM gap_gainers LIMIT 1")
+    except sqlite3.OperationalError:
+        log.info("Migrating DB: adding sector column to gap_gainers...")
+        conn.execute("ALTER TABLE gap_gainers ADD COLUMN sector TEXT DEFAULT ''")
+    try:
+        conn.execute("SELECT sector FROM gap_losers LIMIT 1")
+    except sqlite3.OperationalError:
+        log.info("Migrating DB: adding sector column to gap_losers...")
+        conn.execute("ALTER TABLE gap_losers ADD COLUMN sector TEXT DEFAULT ''")
+
     conn.commit()
     conn.close()
 
@@ -531,6 +543,30 @@ def _format_market_cap(mcap_val):
     return f"{mcap_val:,.0f}"
 
 
+def _fetch_sector(ticker: str) -> str:
+    """Fetch abbreviated sector name for a ticker using yfinance."""
+    _ABBREV = {
+        "Technology": "Tech",
+        "Financial Services": "Financials",
+        "Healthcare": "Healthcare",
+        "Consumer Cyclical": "Cons Cyc",
+        "Consumer Defensive": "Cons Def",
+        "Communication Services": "Comm Svcs",
+        "Industrials": "Industrials",
+        "Basic Materials": "Materials",
+        "Energy": "Energy",
+        "Real Estate": "Real Est",
+        "Utilities": "Utilities",
+    }
+    try:
+        import yfinance as yf
+        info = yf.Ticker(ticker).info
+        sector = info.get("sector") or ""
+        return _ABBREV.get(sector, sector)
+    except Exception:
+        return ""
+
+
 def _yahoo_screener(scr_id, count=100):
     """Fetch quotes from Yahoo Finance predefined screener."""
     url = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
@@ -570,6 +606,7 @@ def fetch_gap_data():
                 continue
 
             iv = _fetch_robust_iv(ticker, price)
+            sector = _fetch_sector(ticker)
 
             gap_gainers.append({
                 "ticker": ticker,
@@ -578,6 +615,7 @@ def fetch_gap_data():
                 "price": round(price, 2),
                 "implied_volatility": iv,
                 "market_cap": _format_market_cap(mcap),
+                "sector": sector,
                 "gap_type": "up",
             })
             if len(gap_gainers) >= MAX_RESULTS:
@@ -599,6 +637,7 @@ def fetch_gap_data():
                 continue
 
             iv = _fetch_robust_iv(ticker, price)
+            sector = _fetch_sector(ticker)
 
             gap_losers.append({
                 "ticker": ticker,
@@ -607,6 +646,7 @@ def fetch_gap_data():
                 "price": round(price, 2),
                 "implied_volatility": iv,
                 "market_cap": _format_market_cap(mcap),
+                "sector": sector,
                 "gap_type": "down",
             })
             if len(gap_losers) >= MAX_RESULTS:
@@ -652,12 +692,12 @@ def poll_gap_data():
             conn.execute("""
                 INSERT OR REPLACE INTO gap_gainers 
                 (ticker, pct_change, dollar_change, price, implied_volatility, 
-                 market_cap, gap_type, poll_date, poll_ts, rank)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 market_cap, sector, gap_type, poll_date, poll_ts, rank)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 item["ticker"], item["pct_change"], item["dollar_change"],
                 item["price"], item["implied_volatility"], item["market_cap"],
-                item["gap_type"], today, ts, item["rank"]
+                item.get("sector", ""), item["gap_type"], today, ts, item["rank"]
             ))
         except Exception as e:
             log.error(f"Error storing gap gainer {item['ticker']}: {e}")
@@ -668,12 +708,12 @@ def poll_gap_data():
             conn.execute("""
                 INSERT OR REPLACE INTO gap_losers 
                 (ticker, pct_change, dollar_change, price, implied_volatility, 
-                 market_cap, gap_type, poll_date, poll_ts, rank)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 market_cap, sector, gap_type, poll_date, poll_ts, rank)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 item["ticker"], item["pct_change"], item["dollar_change"],
                 item["price"], item["implied_volatility"], item["market_cap"],
-                item["gap_type"], today, ts, item["rank"]
+                item.get("sector", ""), item["gap_type"], today, ts, item["rank"]
             ))
         except Exception as e:
             log.error(f"Error storing gap loser {item['ticker']}: {e}")
@@ -1096,7 +1136,7 @@ def api_dates():
 @app.route("/api/data/<date>")
 def api_data(date):
     """Return top short interest records for a given date."""
-    limit = 4 if is_mobile() else 12
+    limit = 8 if is_mobile() else 12
     conn = sqlite3.connect(DB_PATH)
     rows = conn.execute(f"""
         SELECT ticker, short_pct, short_dollar, market_cap, price, poll_ts,
@@ -1134,7 +1174,7 @@ def api_latest():
         conn.close()
         return jsonify([])
     date = row[0]
-    limit = 4 if is_mobile() else 12
+    limit = 8 if is_mobile() else 12
     rows = conn.execute(f"""
         SELECT ticker, short_pct, short_dollar, market_cap, price, poll_ts,
                put_call_ratio, implied_volatility
@@ -1293,7 +1333,7 @@ def api_gap_data(date):
     # Get gap gainers
     gainers_rows = conn.execute("""
         SELECT ticker, pct_change, dollar_change, price, implied_volatility, 
-               market_cap, rank
+               market_cap, rank, COALESCE(sector, '') as sector
         FROM gap_gainers
         WHERE poll_date = ?
         ORDER BY rank
@@ -1303,7 +1343,7 @@ def api_gap_data(date):
     # Get gap losers
     losers_rows = conn.execute("""
         SELECT ticker, pct_change, dollar_change, price, implied_volatility, 
-               market_cap, rank
+               market_cap, rank, COALESCE(sector, '') as sector
         FROM gap_losers
         WHERE poll_date = ?
         ORDER BY rank
@@ -1333,7 +1373,8 @@ def api_gap_data(date):
             "price": row[3],
             "implied_volatility": row[4],
             "market_cap": row[5],
-            "rank": row[6]
+            "rank": row[6],
+            "sector": row[7]
         })
 
     losers = []
@@ -1345,7 +1386,8 @@ def api_gap_data(date):
             "price": row[3],
             "implied_volatility": row[4],
             "market_cap": row[5],
-            "rank": row[6]
+            "rank": row[6],
+            "sector": row[7]
         })
 
     return jsonify({
