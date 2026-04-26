@@ -233,6 +233,7 @@ tbody td {
 .ticker-col { width: 6rem; padding: 0 8px; }
 .ticker-col strong { color: var(--text); letter-spacing: 0.02em; }
 .pct-col    { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; }
+#siTable td.pct-col { text-align: center; }
 .dollar-col { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
 .price-col  { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
 .pc-col     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
