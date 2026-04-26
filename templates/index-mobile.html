@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260426_2355">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260426_0230">
 </head>
 <body>
     <div class="container">
@@ -30,8 +30,8 @@
                 <tr>
                     <th class="rank-col"></th>
                     <th class="ticker-col">Ticker</th>
-                    <th class="pct-col">Short %</th>
-                    <th class="dollar-col">Short $</th>
+                    <th class="pct-col">%SHORT</th>
+                    <th class="dollar-col">$SHORT</th>
                     <th class="pc-col">P/C Ratio</th>
                     <th class="iv-col">IV</th>
                     <th class="price-col">Price</th>
@@ -220,7 +220,7 @@
         function renderGapRow(item, gapDate) {
             const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
             const pctDisplay = (item.pct_change >= 0 ? '+' : '') + item.pct_change.toFixed(2) + '%';
-            const dollarClass = item.dollar_change >= 0 ? 'gap-up' : 'gap-down';
+            const dollarClass = (item.dollar_change == null) ? '' : (item.dollar_change >= 0 ? 'gap-up' : 'gap-down');
             let ivClass = 'iv-low';
             const gapIvRaw = parseFloat(item.implied_volatility);
             const gapIvIlliquid = (gapIvRaw < 0);
@@ -238,7 +238,7 @@
                 <td class="rank-col"></td>
                 <td class="ticker-col"><strong>${item.ticker}</strong></td>
                 <td class="pct-col ${pctClass}" style="font-weight:400">${pctDisplay}</td>
-                <td class="dollar-col ${dollarClass}">${formatDollarChange(item.dollar_change)}</td>
+                <td class="dollar-col ${dollarClass}">${item.dollar_change == null ? 'N/A' : formatDollarChange(item.dollar_change)}</td>
                 <td class="price-col">$${item.price.toFixed(2)}</td>
                 <td class="sector-col">${item.sector || ''}</td>
                 <td class="iv-col ${ivClass}">${ivDisplay}</td>

@@ -638,6 +638,9 @@ def fetch_gap_data():
 
             iv = _fetch_robust_iv(ticker, price)
             sector = _fetch_sector(ticker)
+            # Ensure dollar change is negative for losers
+            if dollar > 0:
+                dollar = -dollar
 
             gap_losers.append({
                 "ticker": ticker,
@@ -1379,10 +1382,19 @@ def api_gap_data(date):
 
     losers = []
     for row in losers_rows:
+        raw_dollar = row[2]
+        # Losers must have negative dollar change; clamp corrupt/positive legacy values
+        # If null (cleaned corrupt record), pass None → displays as N/A on frontend
+        if raw_dollar is None:
+            safe_dollar = None
+        elif abs(raw_dollar) > 1000:  # sanity: per-share change can't be >$1000
+            safe_dollar = None
+        else:
+            safe_dollar = -abs(raw_dollar)
         losers.append({
             "ticker": row[0],
             "pct_change": row[1],
-            "dollar_change": row[2],
+            "dollar_change": safe_dollar,
             "price": row[3],
             "implied_volatility": row[4],
             "market_cap": row[5],

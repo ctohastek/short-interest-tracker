@@ -20,3 +20,4 @@ build/
 .DS_Store
 .superpowers
 tracker_config.json
+watchlist.json

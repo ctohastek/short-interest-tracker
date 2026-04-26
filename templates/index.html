@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260426_2355">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260426_0230">
 </head>
 <body>
     <div class="container">
@@ -56,8 +56,8 @@
                 <tr>
                     <th class="rank-col"></th>
                     <th class="ticker-col">Ticker</th>
-                    <th class="pct-col">Short %</th>
-                    <th class="dollar-col">Short $</th>
+                    <th class="pct-col">%SHORT</th>
+                    <th class="dollar-col">$SHORT</th>
                     <th class="pc-col">P/C Ratio</th>
                     <th class="iv-col" style="font-weight:700">IV</th>
                     <th class="price-col">Price</th>
@@ -251,7 +251,7 @@
         function renderGapRow(item, gapDate) {
             const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
             const pctDisplay = (item.pct_change >= 0 ? '+' : '') + item.pct_change.toFixed(2) + '%';
-            const dollarDisplay = formatDollarChange(item.dollar_change);
+            const dollarDisplay = (item.dollar_change == null) ? 'N/A' : formatDollarChange(item.dollar_change);
             const priceDisplay = formatPrice(item.price);
             let ivClass = 'iv-low';
             const gapIvRaw = parseFloat(item.implied_volatility);
@@ -265,8 +265,8 @@
             let probReversal = Math.min(gapMagnitude * 2 + ivFactor * 10, 95);
             probReversal = Math.max(probReversal, 5);
             const probDisplay = Math.round(probReversal) + '%';
-            // Color dollar change
-            const dollarClass = item.dollar_change >= 0 ? 'gap-up' : 'gap-down';
+            // Color dollar change based on sign (null = neutral)
+            const dollarClass = (item.dollar_change == null) ? '' : (item.dollar_change >= 0 ? 'gap-up' : 'gap-down');
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="rank-col"></td>
