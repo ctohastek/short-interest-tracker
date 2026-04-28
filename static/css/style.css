@@ -776,7 +776,7 @@ footer a:hover {
 .gap-table td.price-col      { text-align: right;  font-variant-numeric: tabular-nums; padding: 0 8px; }
 .gap-table td.iv-col         { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; width: 4rem; }
 .gap-table td.prob-col       { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; padding: 0 8px; width: 5rem; }
-.sector-col     { text-align: center; padding: 0 8px; width: 5.5rem; white-space: nowrap; }
+.gap-table td.sector-col { text-align: center; padding: 0 8px; width: 5.5rem; white-space: nowrap; }
 .gap-table td.pc-col         { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
 .gap-table td.mcap-col       { text-align: right;  font-variant-numeric: tabular-nums; color: #000000; padding: 0 8px; }
 .gap-table td.trade-plan-col { text-align: right;  white-space: nowrap; padding: 0 8px; }

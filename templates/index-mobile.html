@@ -212,7 +212,7 @@
                 }
             } catch (error) {
                 const body = document.getElementById('gapCombinedBody');
-                if (body) body.innerHTML = '<tr><td colspan="8" class="loading">Error loading gap data</td></tr>';
+                if (body) body.innerHTML = '<tr><td colspan="9" class="loading">Error loading gap data</td></tr>';
             }
         }
 
@@ -253,15 +253,16 @@
         function renderGapTables(gapData) {
             const body = document.getElementById('gapCombinedBody');
             if (!body) return;
-            const merged = [...(gapData.gainers || []), ...(gapData.losers || [])];
+            const gainers = (gapData.gainers || []).slice(0, 10);
+            const losers = (gapData.losers || []).slice(0, 10);
+            const merged = [...gainers, ...losers];
             merged.sort((a, b) => b.pct_change - a.pct_change);
             if (merged.length === 0) {
                 body.innerHTML = '<tr><td colspan="9" class="loading">No gap data available</td></tr>';
                 return;
             }
             body.innerHTML = '';
-            const rows = merged.slice(0, 30);
-            rows.forEach(item => body.appendChild(renderGapRow(item, gapData.date)));
+            merged.forEach(item => body.appendChild(renderGapRow(item, gapData.date)));
             document.querySelectorAll('.gap-trade-plan-link').forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
