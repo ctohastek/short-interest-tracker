@@ -206,9 +206,12 @@ thead th {
 thead th.pc-col,
 thead th.iv-col,
 thead th.pct-col,
-thead th.trade-plan-col,
 thead th.rank-col {
     text-align: center;
+}
+
+thead th.trade-plan-col {
+    text-align: right;
 }
 
 tbody tr {
@@ -236,6 +239,8 @@ tbody td {
 #siTable td.pct-col { text-align: center; }
 .dollar-col { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
 .price-col  { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
+.si-sector-col { text-align: center; padding: 0 8px; width: 5.5rem; white-space: nowrap; }
+thead th.si-sector-col { text-align: center; }
 .pc-col     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
 .iv-col     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
 .mcap-col        { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }

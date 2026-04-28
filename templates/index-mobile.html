@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260426_0230">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260427_2335">
 </head>
 <body>
     <div class="container">
@@ -35,12 +35,13 @@
                     <th class="pc-col">P/C Ratio</th>
                     <th class="iv-col">IV</th>
                     <th class="price-col">Price</th>
+                    <th class="si-sector-col">Sector</th>
                     <th class="mcap-col">Mkt Cap</th>
                     <th class="trade-plan-col">Trade Plan</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
-                <tr><td colspan="9" class="loading">Loading data…</td></tr>
+                <tr><td colspan="10" class="loading">Loading data…</td></tr>
             </tbody>
         </table>
         
@@ -79,7 +80,7 @@
                         <th class="price-col">Price</th>
                         <th class="sector-col">Sector</th>
                         <th class="iv-col">IV</th>
-                        <th class="prob-col">TREND REV</th>
+                        <th class="prob-col">IS TREND REV</th>
                         <th class="trade-plan-col">Trade Plan</th>
                     </tr>
                 </thead>
@@ -441,7 +442,7 @@
             }
 
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="loading">No data available for this date</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="loading">No data available for this date</td></tr>';
                 return;
             }
 
@@ -477,6 +478,7 @@
                     <td class="pc-col ${pcClass}">${pcDisplay}</td>
                     <td class="iv-col ${ivClass}">${ivDisplay}</td>
                     <td class="price-col">$${row.price.toFixed(2)}</td>
+                    <td class="si-sector-col">${row.sector || ''}</td>
                     <td class="mcap-col">${row.market_cap || 'N/A'}</td>
                     <td class="trade-plan-col"><a href="#" class="trade-plan-link" data-ticker="${row.ticker}" data-date="${date}" title="Trade Plan for ${row.ticker}">Trade Plan</a></td>
                 `;

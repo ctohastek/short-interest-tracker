@@ -168,6 +168,13 @@ def init_db():
         log.info("Migrating DB: adding implied_volatility column...")
         conn.execute("ALTER TABLE short_interest ADD COLUMN implied_volatility REAL")
 
+    # Migrate: add sector column to short_interest table
+    try:
+        conn.execute("SELECT sector FROM short_interest LIMIT 1")
+    except sqlite3.OperationalError:
+        log.info("Migrating DB: adding sector column to short_interest...")
+        conn.execute("ALTER TABLE short_interest ADD COLUMN sector TEXT DEFAULT ''")
+
     # Migrate: add sector column to gap tables if missing
     try:
         conn.execute("SELECT sector FROM gap_gainers LIMIT 1")
@@ -443,6 +450,7 @@ def fetch_ticker_data(ticker):
         except Exception as e:
             log.warning(f"Failed to fetch IV for {ticker}: {e}")
 
+        sector = _fetch_sector(ticker)
         return {
             "ticker": ticker,
             "short_pct": short_pct,
@@ -451,6 +459,7 @@ def fetch_ticker_data(ticker):
             "price": price,
             "put_call_ratio": put_call,
             "implied_volatility": implied_volatility,
+            "sector": sector,
         }
 
     except Exception as e:
@@ -911,12 +920,12 @@ def poll_all_tickers():
             conn.execute("""
                 INSERT OR REPLACE INTO short_interest
                 (ticker, short_pct, short_dollar, market_cap, price, put_call_ratio,
-                 implied_volatility, poll_date, poll_ts)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 implied_volatility, sector, poll_date, poll_ts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 row["ticker"], row["short_pct"], row["short_dollar"],
                 row["market_cap"], row["price"], row["put_call_ratio"],
-                row["implied_volatility"], today, ts,
+                row["implied_volatility"], row.get("sector", ""), today, ts,
             ))
         except Exception as e:
             log.error(f"DB insert error for {row['ticker']}: {e}")
@@ -1180,7 +1189,7 @@ def api_latest():
     limit = 8 if is_mobile() else 12
     rows = conn.execute(f"""
         SELECT ticker, short_pct, short_dollar, market_cap, price, poll_ts,
-               put_call_ratio, implied_volatility
+               put_call_ratio, implied_volatility, COALESCE(sector, '') as sector
         FROM short_interest
         WHERE poll_date = ?
         ORDER BY short_pct DESC
@@ -1199,6 +1208,7 @@ def api_latest():
             "poll_ts": r[5],
             "put_call_ratio": r[6] or 0.0,
             "implied_volatility": r[7] or 0.0,
+            "sector": r[8],
         })
     return jsonify({"date": date, "data": data})
 
