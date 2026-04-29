@@ -247,6 +247,9 @@ tbody td.si-sector-col { text-align: center !important; }
 .mcap-col        { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
 tbody td.mcap-col { color: #000000; }
 thead th.mcap-col { color: var(--text-muted); }
+/* Top SI table: center mcap header + cells */
+#siTable thead th.mcap-col,
+#siTable tbody td.mcap-col { text-align: center !important; }
 .trade-plan-col  { white-space: nowrap; text-align: right; padding: 0 8px; }
 
 .high-si    { color: var(--high-si); }
