@@ -1152,7 +1152,7 @@ def api_data(date):
     conn = sqlite3.connect(DB_PATH)
     rows = conn.execute(f"""
         SELECT ticker, short_pct, short_dollar, market_cap, price, poll_ts,
-               put_call_ratio, implied_volatility
+               put_call_ratio, implied_volatility, COALESCE(sector, '') as sector
         FROM short_interest
         WHERE poll_date = ?
         ORDER BY short_pct DESC
@@ -1171,6 +1171,7 @@ def api_data(date):
             "poll_ts": r[5],
             "put_call_ratio": r[6] or 0.0,
             "implied_volatility": r[7] or 0.0,
+            "sector": r[8],
         })
     return jsonify(data)
 

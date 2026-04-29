@@ -239,8 +239,9 @@ tbody td {
 #siTable td.pct-col { text-align: center; }
 .dollar-col { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
 .price-col  { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
-.si-sector-col { text-align: center; padding: 0 8px; width: 5.5rem; white-space: nowrap; }
-thead th.si-sector-col { text-align: center; }
+.si-sector-col { text-align: center !important; padding: 0 8px; width: 5.5rem; white-space: nowrap; }
+thead th.si-sector-col { text-align: center !important; }
+tbody td.si-sector-col { text-align: center !important; }
 .pc-col     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
 .iv-col     { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; padding: 0 8px; }
 .mcap-col        { text-align: right; font-variant-numeric: tabular-nums; padding: 0 8px; }
