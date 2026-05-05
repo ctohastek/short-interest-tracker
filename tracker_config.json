@@ -20,5 +20,10 @@
         "hours": [10, 15],
         "days": "mon-fri"
     },
+    "gap_poll_schedule": {
+        "hour": 9,
+        "minute": 35,
+        "days": "mon-fri"
+    },
     "keep_days": 10
 }

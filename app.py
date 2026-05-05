@@ -681,7 +681,7 @@ def fetch_gap_data():
 
 
 def poll_gap_data():
-    """Poll and store gap data at market open (9:30 AM EST)."""
+    """Poll and store gap data at market open (9:35 AM EST)."""
     log.info("Starting gap data poll...")
     today = datetime.now(EST).strftime("%Y-%m-%d")
     ts = int(time.time())
