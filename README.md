@@ -1,7 +1,7 @@
 
 #### Short Interest Tracker
 
-
+ - demo (trading hours) https://shortinterest.hastek.net/
  - scrapes finviz, yahoo for short interest, gap up, gainers/losers data
  - stores top 12 by short-interest % in SQLite, 5 day lookback
  - inline watch list management
