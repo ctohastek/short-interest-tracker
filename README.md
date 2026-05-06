@@ -15,6 +15,8 @@
   <img src="https://data1photo.s3.us-east-1.amazonaws.com/ShortInt-SqueezeTradePlan.png" alt="Squeeze Trade Plan" width="44%">
   <br/>
   <img src="https://data1photo.s3.us-east-1.amazonaws.com/ShortInt-GapTradePlan.png" alt="Gap Trade Plan" width="44%">
+  <br/>
+  <img src="https://data1photo.s3.us-east-1.amazonaws.com/ShortInt-watchlist.png" alt="Gap Trade Plan" width="44%">
 </div>
 
 
