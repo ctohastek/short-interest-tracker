@@ -10,9 +10,11 @@
  - open new tab with ticker at tradingview.com 
 
 <div align="left">
-  <img src="https://data1photo.s3.us-east-1.amazonaws.com/shortinteresttracker-screenshot.png" alt="Main Page" width="44%">
+  <img src="https://data1photo.s3.us-east-1.amazonaws.com/ShortInt-main.png" alt="Main Page" width="44%">
   <br/>
-  <img src="https://data1photo.s3.us-east-1.amazonaws.com/tradeplan.png" alt="Trade Plan" width="44%">
+  <img src="https://data1photo.s3.us-east-1.amazonaws.com/ShortInt-SqueezeTradePlan.png" alt="Squeeze Trade Plan" width="44%">
+  <br/>
+  <img src="https://data1photo.s3.us-east-1.amazonaws.com/ShortInt-GapTradePlan.png" alt="Gap Trade Plan" width="44%">
 </div>
 
 
