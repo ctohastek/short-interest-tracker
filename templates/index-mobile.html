@@ -369,8 +369,8 @@
                 // Update popup content
                 document.getElementById('tradePlanTicker').textContent = `${ticker} - Gap Analysis`;
                 
-                // Set chart link — 1H chart, clicking opens new tab
-                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=60`;
+                // Set chart link — daily chart (YTD), clicking opens new tab
+                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=D&range=YTD`;
                 const mobileChartLink = document.getElementById('mobileChartLink');
                 if (mobileChartLink) { mobileChartLink.href = tvUrl; mobileChartLink.textContent = `Open ${ticker} Chart`; }
                 

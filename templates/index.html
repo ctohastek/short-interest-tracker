@@ -425,11 +425,11 @@
                 document.getElementById('tradePlanTicker').textContent = `${ticker} - Gap Analysis`;
                 
                 // Set chart link — 1H TradingView, click opens new tab
-                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=60`;
+                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=D&range=YTD`;
                 setChartOverlayUrl(tvUrl);
                 
-                // Embed 1H chart in iframe
-                const embedUrl = 'https://s.tradingview.com/widgetembed/?symbol=' + ticker + '&interval=60&range=1D&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en';
+                // Embed daily chart in iframe (YTD range)
+                const embedUrl = 'https://s.tradingview.com/widgetembed/?symbol=' + ticker + '&interval=D&range=YTD&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en';
                 const iframe = document.getElementById('tradePlanChart');
                 if (iframe) iframe.src = embedUrl;
                 
