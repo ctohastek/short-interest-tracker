@@ -4,17 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260429_1640">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260508_2330">
 </head>
 <body>
     <div class="container">
-        <!-- Two-column page layout -->
+        <!-- Three-column page layout -->
         <div class="page-layout">
 
         <!-- LEFT COLUMN: Intraday table -->
         <div class="left-col">
             <div class="intraday-header">Intraday Gainers/Losers</div>
-            <!-- Intraday Movers Table -->
             <div class="gap-section intraday-section" id="intradaySection">
                 <table class="gap-table intraday-table" id="intradayTable">
                     <thead>
@@ -31,11 +30,10 @@
             </div>
         </div>
 
-        <!-- RIGHT COLUMN: everything else -->
-        <div class="right-col">
+        <!-- MIDDLE COLUMN: Short Interest Tracker -->
+        <div class="middle-col">
         <header>
             <h1><span class="header-icon">📉</span> Short Interest Tracker</h1>
-            <p class="subtitle">Top 12 highest short interest from watchlist</p>
         </header>
 
         <nav class="date-nav" id="dateNav">
@@ -43,7 +41,6 @@
             <div class="date-buttons" id="dateButtons">
                 <!-- filled by JS -->
             </div>
-            <button type="button" id="watchlistOpenBtn" class="lookup-btn watchlist-nav-btn">Edit Watchlist</button>
         </nav>
 
         <div class="meta-row" id="metaRow">
@@ -60,19 +57,15 @@
                     <th class="dollar-col">$SHORT</th>
                     <th class="pc-col">P/C Ratio</th>
                     <th class="iv-col" style="font-weight:700">IV</th>
-                    <th class="price-col">Price</th>
-                    <th class="si-sector-col">Sector</th>
-                    <th class="mcap-col">Mkt Cap</th>
-                    <th class="trade-plan-col">Trade Plan</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
-                <tr><td colspan="10" class="loading">Loading data…</td></tr>
+                <tr><td colspan="6" class="loading">Loading data…</td></tr>
             </tbody>
         </table>
-        
-        <!-- Controls row: ticker lookup right -->
-        <div class="controls-row">
+
+        <!-- Controls: Ticker lookup + Edit Watchlist, below SI table -->
+        <div class="controls-below-table">
             <form id="tickerLookupForm" class="lookup-form">
                 <label for="customTicker" class="lookup-label">Ticker:</label>
                 <input
@@ -86,11 +79,14 @@
                 <button type="submit" class="lookup-btn">Go</button>
                 <button type="button" id="resetLookup" class="reset-btn" style="display: none;">Back</button>
             </form>
-            <div id="lookupError" class="error-message" style="display: none;"></div>
+            <button type="button" id="watchlistOpenBtn" class="lookup-btn">Edit Watchlist</button>
         </div>
-        
-        <!-- Combined Gap Gainers & Losers Table -->
-        <div class="gap-section">
+        <div id="lookupError" class="error-message" style="display: none;"></div>
+        </div><!-- end middle-col -->
+
+        <!-- RIGHT COLUMN: Gap table -->
+        <div class="right-col">
+        <div class="gap-section gap-section-right">
             <div class="gap-subtitle">
                 <span>Pre-Mkt Gap Gainers &amp; Losers (Mkt Cap 10B–200B)</span>
                 <div class="gap-poll-time" id="gapCombinedPollTime"></div>
@@ -103,24 +99,15 @@
                         <th class="pct-col">%CHANGE</th>
                         <th class="dollar-col">$CHANGE</th>
                         <th class="price-col">Price</th>
-                        <th class="sector-col">Sector</th>
-                        <th class="iv-col">IV</th>
-                        <th class="prob-col">IS TREND REV</th>
-                        <th class="mcap-col">Mkt Cap</th>
-                        <th class="trade-plan-col">Trade Plan</th>
                     </tr>
                 </thead>
                 <tbody id="gapCombinedBody">
-                    <tr><td colspan="10" class="loading">Loading gap data…</td></tr>
+                    <tr><td colspan="5" class="loading">Loading gap data…</td></tr>
                 </tbody>
             </table>
         </div>
-
-
-        <footer>
-            <p class="footer-note">Data sourced from <a href="https://finviz.com" target="_blank">Finviz</a>, <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a>  • Charts via <a href="https://tradingview.com" target="_blank">TradingView</a> widget</p>
-        </footer>
         </div><!-- end right-col -->
+
         </div><!-- end page-layout -->
     </div>
 
@@ -180,7 +167,7 @@
             const container = document.getElementById('dateButtons');
             container.innerHTML = '';
 
-            dates.forEach((d, i) => {
+            dates.slice(0, 5).forEach((d, i) => {
                 const btn = document.createElement('button');
                 btn.className = 'date-btn' + (i === 0 ? ' active' : '');
                 btn.textContent = formatDateShort(d);
@@ -225,7 +212,7 @@
                 }
             } catch (error) {
                 const body = document.getElementById('gapCombinedBody');
-                if (body) body.innerHTML = '<tr><td colspan="10" class="loading">Error loading gap data</td></tr>';
+                if (body) body.innerHTML = '<tr><td colspan="5" class="loading">Error loading gap data</td></tr>';
             }
         }
         
@@ -248,41 +235,25 @@
             return `$${formatCurrency(num)}`;
         }
         
-        // ── Render merged gap table (5 gainers + 5 losers, sorted by %CHANGE desc) ──
+        // ── Render merged gap table — 5 cols: rank, ticker, %CHANGE, $CHANGE, Price ──
         function renderGapRow(item, gapDate) {
             const pctClass = item.pct_change >= 0 ? 'gap-up' : 'gap-down';
             const pctDisplay = (item.pct_change >= 0 ? '+' : '') + item.pct_change.toFixed(2) + '%';
             const dollarDisplay = (item.dollar_change == null) ? 'N/A' : formatDollarChange(item.dollar_change);
             const priceDisplay = formatPrice(item.price);
-            let ivClass = 'iv-low';
-            const gapIvRaw = parseFloat(item.implied_volatility);
-            const gapIvIlliquid = (gapIvRaw < 0);
-            const gapIv = gapIvIlliquid ? 0 : (gapIvRaw || 0);
-            const ivDisplay = gapIvIlliquid ? 'N/A' : gapIv.toFixed(1) + '%';
-            if (gapIv > 100) ivClass = 'iv-extreme';
-            else if (gapIv > 25) ivClass = 'iv-high';
-            const gapMagnitude = Math.abs(item.pct_change);
-            const ivFactor = Math.min(gapIv / 100, 1.5);
-            let probReversal = Math.min(gapMagnitude * 2 + ivFactor * 10, 95);
-            probReversal = Math.max(probReversal, 5);
-            const probDisplay = Math.round(probReversal) + '%';
-            // Color dollar change based on sign (null = neutral)
             const dollarClass = (item.dollar_change == null) ? '' : (item.dollar_change >= 0 ? 'gap-up' : 'gap-down');
             const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
             tr.innerHTML = `
                 <td class="rank-col"></td>
                 <td class="ticker-col"><strong>${item.ticker}</strong></td>
                 <td class="pct-col ${pctClass}" style="font-weight:400">${pctDisplay}</td>
                 <td class="dollar-col ${dollarClass}">${dollarDisplay}</td>
                 <td class="price-col">${priceDisplay}</td>
-                <td class="sector-col">${item.sector || ''}</td>
-                <td class="iv-col ${ivClass}">${ivDisplay}</td>
-                <td class="prob-col">${probDisplay}</td>
-                <td class="mcap-col">${item.market_cap}</td>
-                <td class="trade-plan-col">
-                    <a href="#" class="gap-trade-plan-link" data-ticker="${item.ticker}" data-date="${gapDate}">Gap Trade Plan</a>
-                </td>
             `;
+            tr.addEventListener('click', () => {
+                showGapTradePlan(item.ticker, gapDate);
+            });
             return tr;
         }
 
@@ -294,17 +265,11 @@
             const merged = [...gainers, ...losers];
             merged.sort((a, b) => b.pct_change - a.pct_change);
             if (merged.length === 0) {
-                body.innerHTML = '<tr><td colspan="10" class="loading">No gap data available</td></tr>';
+                body.innerHTML = '<tr><td colspan="5" class="loading">No gap data available</td></tr>';
                 return;
             }
             body.innerHTML = '';
             merged.forEach(item => body.appendChild(renderGapRow(item, gapData.date)));
-            document.querySelectorAll('.gap-trade-plan-link').forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    showGapTradePlan(this.dataset.ticker, this.dataset.date);
-                });
-            });
         }
         
         // ── Load intraday data ──
@@ -359,59 +324,6 @@
             rows.forEach(item => body.appendChild(renderIntradayRow(item, data.date)));
         }
 
-        // ── Show intraday trade plan (unused in simplified intraday table) ──
-        async function showIntradayTradePlan(ticker, date) {
-            try {
-                const resp = await fetch(`/api/intraday-trade-plan/${ticker}/${date}`);
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                const plan = await resp.json();
-
-                document.getElementById('tradePlanTicker').textContent = `${ticker} - Intraday Analysis`;
-                const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=5`;
-                setChartOverlayUrl(tvUrl);
-                const mobileChartLink = document.getElementById('mobileChartLink');
-                if (mobileChartLink) mobileChartLink.href = tvUrl;
-                const embedUrl = 'https://s.tradingview.com/widgetembed/?symbol=' + ticker + '&interval=5&range=1D&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en';
-                const iframe = document.getElementById('tradePlanChart');
-                if (iframe) iframe.src = embedUrl;
-
-                const ivDisp = plan.implied_volatility < 0 ? 'N/A' : (plan.implied_volatility > 0 ? plan.implied_volatility.toFixed(1) + '%' : '—');
-                document.getElementById('tradePlanContent').innerHTML = `
-                    <div class="plan-section">
-                        <h5>${plan.direction.charAt(0).toUpperCase() + plan.direction.slice(1)}: ${plan.move_description}</h5>
-                        <p>${plan.analysis}</p>
-                    </div>
-                    <div class="plan-section">
-                        <h5>Trade Parameters</h5>
-                        <ul>
-                            <li><strong>Entry:</strong> $${plan.entry.toFixed(2)}</li>
-                            <li><strong>Stop:</strong> $${plan.stop.toFixed(2)}</li>
-                            <li><strong>Target:</strong> $${plan.target.toFixed(2)}</li>
-                            <li><strong>Risk/Reward:</strong> ${plan.risk_reward}:1</li>
-                        </ul>
-                    </div>
-                    <div class="plan-section">
-                        <h5>Options &amp; Volatility</h5>
-                        <p>${plan.iv_analysis}</p>
-                        <p>IV: <strong>${ivDisp}</strong> | P/C: <strong>${plan.put_call_ratio > 0 ? plan.put_call_ratio.toFixed(2) : '—'}</strong></p>
-                    </div>
-                    ${plan.si_note ? `<div class="plan-section"><h5>Short Interest</h5><p>${plan.si_note}</p></div>` : ''}
-                    <div class="plan-section">
-                        <h5>Key Considerations</h5>
-                        <ul>
-                            <li>Monitor VWAP for continuation vs. reversal signals</li>
-                            <li>Volume confirmation is critical for intraday moves</li>
-                            <li>Watch overall market tone (SPY/QQQ momentum)</li>
-                            <li>${plan.implied_volatility < 0 ? 'IV data unavailable (illiquid options)' : plan.implied_volatility > 50 ? 'High IV — consider defined-risk strategies' : 'Options may provide good risk/reward'}</li>
-                        </ul>
-                    </div>
-                `;
-                document.getElementById('tradePlanPopup').style.display = 'flex';
-            } catch (err) {
-                alert(`Could not load trade plan for ${ticker}: ${err.message}`);
-            }
-        }
-
         // ── Show gap trade plan ──
         async function showGapTradePlan(ticker, date) {
             try {
@@ -421,19 +333,15 @@
                 }
                 const plan = await resp.json();
                 
-                // Update popup content
                 document.getElementById('tradePlanTicker').textContent = `${ticker} - Gap Analysis`;
                 
-                // Set chart link — 1H TradingView, click opens new tab
                 const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=D&range=YTD`;
                 setChartOverlayUrl(tvUrl);
                 
-                // Embed daily chart in iframe (YTD range)
                 const embedUrl = 'https://s.tradingview.com/widgetembed/?symbol=' + ticker + '&interval=D&range=YTD&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en';
                 const iframe = document.getElementById('tradePlanChart');
                 if (iframe) iframe.src = embedUrl;
                 
-                // Build analysis HTML
                 const analysisPane = document.getElementById('analysisPane');
                 analysisPane.innerHTML = `
                     <div class="trade-plan-details">
@@ -485,12 +393,9 @@
                                 <li>${plan.implied_volatility < 0 ? 'IV data unavailable (illiquid options)' : plan.implied_volatility > 50 ? 'High IV suggests considering defined-risk options strategies' : 'Options may provide good risk/reward'}</li>
                             </ul>
                         </div>
-                        
-
                     </div>
                 `;
                 
-                // Show popup
                 document.getElementById('tradePlanPopup').style.display = 'flex';
                 document.getElementById('popupOverlay').style.display = 'block';
                 
@@ -500,7 +405,7 @@
             }
         }
 
-        // ── Render table ──
+        // ── Render table — 6 cols: rank, ticker, %SHORT, $SHORT, P/C, IV ──
         function renderTable(data, date) {
             currentViewDate = date;
             const tbody = document.getElementById('tableBody');
@@ -514,7 +419,7 @@
             }
 
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="loading">No data available for this date</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="loading">No data available for this date</td></tr>';
                 return;
             }
 
@@ -523,18 +428,16 @@
                 const tr = document.createElement('tr');
                 tr.className = i % 2 === 0 ? 'row-white' : 'row-gray';
                 tr.dataset.ticker = row.ticker;
+                tr.style.cursor = 'pointer';
 
                 const pctClass = row.short_pct >= 20 ? 'high-si' :
                                  row.short_pct >= 10 ? 'med-si' : '';
 
-                // Put/Call color: >1.0 = bearish (red tint), <0.7 = bullish (green tint)
                 const pc = row.put_call_ratio;
                 const pcClass = pc > 1.0 ? 'pc-bearish' :
                                 pc > 0 && pc < 0.7 ? 'pc-bullish' : '';
                 const pcDisplay = pc > 0 ? pc.toFixed(2) : '—';
 
-                // IV color: green if under 25%, red if over 25%, bold if over 100%
-                // Sentinel -1 means illiquid/capped (>300%)
                 const ivRaw = parseFloat(row.implied_volatility);
                 const ivIlliquid = (ivRaw < 0);
                 const iv = ivIlliquid ? 0 : (ivRaw || 0);
@@ -549,17 +452,11 @@
                     <td class="dollar-col">${row.short_dollar}</td>
                     <td class="pc-col ${pcClass}">${pcDisplay}</td>
                     <td class="iv-col ${ivClass}">${ivDisplay}</td>
-                    <td class="price-col">$${row.price.toFixed(2)}</td>
-                    <td class="si-sector-col">${row.sector || ''}</td>
-                    <td class="mcap-col">${row.market_cap || 'N/A'}</td>
-                    <td class="trade-plan-col"><a href="#" class="trade-plan-link" data-ticker="${row.ticker}" data-date="${date}" title="Trade Plan for ${row.ticker}">Trade Plan</a></td>
                 `;
 
-                // Remove row click handler since we're removing hover tooltips
-                // tr.addEventListener('click', (e) => {
-                //     if (e.target.closest('a')) return;
-                //     window.open(tvUrl, '_blank');
-                // });
+                tr.addEventListener('click', () => {
+                    showTradePlan(row.ticker, date);
+                });
 
                 tbody.appendChild(tr);
             });
@@ -575,18 +472,7 @@
         const closeTradePlan = document.getElementById('closeTradePlan');
         const popupOverlay = document.getElementById('popupOverlay');
 
-        // Add event listeners for trade plan links
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('trade-plan-link')) {
-                e.preventDefault();
-                const ticker = e.target.dataset.ticker;
-                const date = e.target.dataset.date;
-                showTradePlan(ticker, date);
-            }
-        });
-
         closeTradePlan.addEventListener('click', hideTradePlan);
-        // popupOverlay click is handled in the unified handler below (watchlist + trade plan)
 
         function setChartOverlayUrl(tvUrl) {
             const overlay = document.getElementById('chartClickOverlay');
@@ -603,19 +489,16 @@
             currentTradePlanTicker = ticker;
             tradePlanTicker.textContent = `${ticker} — Trade Plan`;
             
-            // Set up chart: 1D embed, click opens 1H TV
             const tvUrl = `https://www.tradingview.com/chart/?symbol=${ticker}&interval=60`;
             const chartUrl = 'https://s.tradingview.com/widgetembed/?symbol=' + ticker + '&interval=D&range=1M&hideideas=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&theme=light&style=1&timezone=exchange&withdateranges=0&locale=en';
             tradePlanChart.src = chartUrl;
             tradePlanChart.dataset.ticker = ticker;
             setChartOverlayUrl(tvUrl);
             
-            // Show loading state
             analysisPane.innerHTML = '<div class="loading-plan">Loading trade plan...</div>';
             tradePlanPopup.style.display = 'flex';
             popupOverlay.style.display = 'block';
             
-            // Fetch trade plan from API
             fetch(`/api/trade-plan/${ticker}/${date}`)
                 .then(resp => {
                     if (!resp.ok) {
@@ -639,18 +522,14 @@
         function hideTradePlan() {
             tradePlanPopup.style.display = 'none';
             popupOverlay.style.display = 'none';
-            // Clear chart to stop loading
             tradePlanChart.src = '';
-            // Clear current ticker
             currentTradePlanTicker = null;
         }
 
         function renderTradePlan(data) {
             const { ticker, date, analysis } = data;
             
-            // Make SHORT_PCT_VALUE bold in the overview
             let overview = analysis.overview || 'No overview available.';
-            // Find and bold the percentage value (looks for patterns like "shows 15.25% short interest")
             overview = overview.replace(/(shows\s+)(\d+\.?\d*%)(\s+short interest)/i, 
                 '$1<strong>$2</strong>$3');
             
@@ -718,11 +597,6 @@
             });
         }
 
-        // Chart link will be selected when popup opens
-        // (element exists in HTML but might not be in DOM yet)
-
-
-        
         // ── Quick Lookup ──
         const lookupForm = document.getElementById('tickerLookupForm');
         const customTickerInput = document.getElementById('customTicker');
@@ -735,13 +609,12 @@
         let isLookupMode = false;
         let currentLookupTicker = '';
         
-        // Ticker validation regex (letters and numbers only, no !)
         const TICKER_REGEX = /^[A-Za-z0-9]{1,5}$/;
         
         function validateTicker(ticker) {
             ticker = ticker.trim().toUpperCase();
             if (!TICKER_REGEX.test(ticker)) {
-                return { valid: false, error: 'Invalid ticker format. Use 1-5 letters/numbers or ! for futures.' };
+                return { valid: false, error: 'Invalid ticker format. Use 1-5 letters/numbers.' };
             }
             return { valid: true, ticker };
         }
@@ -753,21 +626,14 @@
                 lookupError.style.display = 'none';
             }, 5000);
             
-            // Ensure Back button is still visible in lookup mode
             if (isLookupMode) {
                 resetLookupBtn.style.display = 'inline-block';
             }
-            
-            // Debug log
-            console.log('showError called. isLookupMode:', isLookupMode, 'currentLookupTicker:', currentLookupTicker);
         }
         
         function fetchCustomTickerData(ticker, date) {
-            // Always show Back button during fetch (we're entering/continuing lookup mode)
             resetLookupBtn.style.display = 'inline-block';
-            
-            // Show loading
-            tableBody.innerHTML = '<tr><td colspan="8" class="loading">Fetching data for ' + ticker + '…</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="6" class="loading">Fetching data for ' + ticker + '…</td></tr>';
             
             fetch(`/api/custom-ticker/${ticker}/${date}`)
                 .then(res => {
@@ -787,9 +653,7 @@
                 })
                 .catch(err => {
                     showError(err.message);
-                    // Keep Back button visible
                     resetLookupBtn.style.display = 'inline-block';
-                    // If we have a current ticker, restore it
                     if (currentLookupTicker && currentLookupTicker !== ticker) {
                         fetchCustomTickerData(currentLookupTicker, date);
                     }
@@ -797,23 +661,19 @@
         }
         
         function renderSingleTicker(row, date, ticker) {
-            // Hide date navigation in lookup mode
             dateNav.style.display = 'none';
             metaRow.innerHTML = `<span>Single ticker: <strong>${ticker}</strong> • Date: ${formatDateLong(date)}</span>`;
             
-            // Render single row
             const tr = document.createElement('tr');
             tr.className = 'data-row';
+            tr.style.cursor = 'pointer';
             
-            // Calculate classes for coloring
             const pctClass = row.short_pct >= 20 ? 'high-si' : row.short_pct >= 10 ? 'med-si' : '';
             const pc = row.put_call_ratio;
             const pcClass = pc > 1.0 ? 'pc-bearish' :
                             pc > 0 && pc < 0.7 ? 'pc-bullish' : '';
             const pcDisplay = pc > 0 ? pc.toFixed(2) : '—';
             
-            // IV color: green if under 25%, red if over 25%, bold if over 100%
-            // Sentinel -1 means illiquid/capped (>300%)
             const ivRaw2 = parseFloat(row.implied_volatility);
             const ivIlliquid2 = (ivRaw2 < 0);
             const iv = ivIlliquid2 ? 0 : (ivRaw2 || 0);
@@ -828,22 +688,21 @@
                 <td class="dollar-col">${row.short_dollar}</td>
                 <td class="pc-col ${pcClass}">${pcDisplay}</td>
                 <td class="iv-col ${ivClass}">${ivDisplay}</td>
-                <td class="price-col">$${row.price.toFixed(2)}</td>
-                <td class="mcap-col">${row.market_cap || 'N/A'}</td>
-                <td class="trade-plan-col"><a href="#" class="trade-plan-link" data-ticker="${ticker}" data-date="${date}" title="Trade Plan for ${ticker}">Trade Plan</a></td>
             `;
+
+            tr.addEventListener('click', () => {
+                showTradePlan(ticker, date);
+            });
             
             tableBody.innerHTML = '';
             tableBody.appendChild(tr);
             
-            // Show reset button
             resetLookupBtn.style.display = 'inline-block';
             isLookupMode = true;
             currentLookupTicker = ticker;
         }
         
         function resetLookup() {
-            // Simply reload the page - guaranteed clean state
             window.location.href = '/';
         }
         
@@ -859,7 +718,6 @@
             
             const ticker = validation.ticker;
             
-            // Get current date
             const activeDate = document.querySelector('.date-btn.active')?.dataset.date;
             if (!activeDate) {
                 showError('Please select a date first');
@@ -871,7 +729,6 @@
         
         resetLookupBtn.addEventListener('click', resetLookup);
         
-        // Fix: Remove invalid state from input on page load
         setTimeout(() => {
             customTickerInput.classList.remove(':invalid');
             customTickerInput.setCustomValidity('');
@@ -884,7 +741,6 @@
         let wlDirty = false;
 
         function sanitizeTicker(raw) {
-            // Only uppercase alpha chars, max 5
             return raw.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
         }
 
@@ -981,7 +837,6 @@
                 e.preventDefault();
                 document.getElementById('watchlistAddBtn').click();
             }
-            // Force uppercase as user types
             setTimeout(() => { this.value = this.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 5); }, 0);
         });
 
@@ -1014,7 +869,7 @@
         document.getElementById('popupOverlay').addEventListener('click', function() {
             if (document.getElementById('watchlistPopup').classList.contains('open')) {
                 wlClose();
-            } else if (document.getElementById('tradePlanPopup').style.display === 'block') {
+            } else if (document.getElementById('tradePlanPopup').style.display === 'flex') {
                 hideTradePlan();
             }
         });
