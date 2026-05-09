@@ -1,5 +1,5 @@
 /* ── Short Interest Tracker — Styles ── */
-/* v=20260508_2315 */
+/* v=20260509_0120 */
 
 :root {
     --bg: #fafbfc;
@@ -36,9 +36,10 @@ body {
 
 .container {
     margin: 0;
-    padding: 2rem 90px;
+    padding: 1rem 8px;
     box-sizing: border-box;
     width: 100%;
+    position: relative;
 }
 
 /* ── Three-column page layout ── */
@@ -64,6 +65,7 @@ body {
 .right-col {
     flex: 1;
     min-width: 0;
+    position: relative;
 }
 
 .intraday-header {
@@ -71,22 +73,31 @@ body {
     font-weight: 700;
     color: var(--text);
     letter-spacing: -0.01em;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
 }
 
 
 
 /* ── Header ── */
 header {
-    text-align: left;  /* Changed from center to left */
-    margin-bottom: 1.5rem;
+    text-align: left;
+    margin-bottom: 0.5rem;
+    padding-top: 0;
+}
+
+.si-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
 }
 
 header h1 {
-    font-size: 0.85rem;  /* ~60% of original 1.4rem */
+    font-size: 0.85rem;
     font-weight: 700;
     letter-spacing: -0.01em;
-    margin-bottom: 0.25rem;
+    margin-top: 0;
+    margin-bottom: 0;
 }
 
 header h1 .header-icon {
@@ -100,13 +111,42 @@ header h1 .header-icon {
     text-align: left;  /* Added left alignment */
 }
 
-/* ── Date Navigation ── */
-.date-nav {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
+
+/* ── About Link ── */
+.about-link {
+    font-size: 0.85rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+    z-index: 10;
+    cursor: pointer;
+}
+.about-link:hover {
+    text-decoration: underline;
+    color: #5a6a80;
+}
+
+/* Fixed bottom-right corner — all screen sizes */
+.about-link-abs {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 100;
+}
+
+/* Mobile about row — hidden, using fixed link instead */
+.about-mobile-row {
+    display: none;
+}
+.about-link:hover {
+    text-decoration: underline;
+    color: #5a6a80;
+}
+
+/* Date nav when placed below SI table */
+.date-nav-below {
+    margin-top: 0.75rem;
+    margin-bottom: 0;
 }
 
 /* Watchlist button next to Go — no special positioning needed */
@@ -178,7 +218,9 @@ header h1 .header-icon {
 }
 
 #lastPoll {
-    margin-left: auto;  /* Push to right side */
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    white-space: nowrap;
 }
 
 /* ── Table ── */
@@ -710,6 +752,7 @@ footer a:hover {
 /* Gap section when it's primary content of right-col — no top margin */
 .gap-section-right {
     margin-top: 0;
+    padding-top: 0;
 }
 
 .gap-header-row {
@@ -739,7 +782,7 @@ footer a:hover {
     font-weight: 700;
     letter-spacing: -0.01em;
     text-align: left;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -769,7 +812,7 @@ footer a:hover {
 
 /* All gap table headers: same weight/size as main table */
 .gap-table th {
-    padding: 0.5rem 8px;
+    padding: 0 8px;
     font-weight: 700;
     font-size: 0.8rem;
     color: var(--text-muted);
@@ -928,7 +971,7 @@ footer a:hover {
 
 .intraday-table thead th {
     font-size: 0.8rem;
-    padding: 0.5rem 8px;
+    padding: 0 8px;
     text-align: left;
     font-weight: 700;
     text-transform: uppercase;
@@ -1169,4 +1212,72 @@ footer a:hover {
     font-size: 0.8rem;
     margin-bottom: 0.4rem;
     min-height: 1.1em;
+}
+
+/* ── About Popup ── */
+.about-popup {
+    display: none;
+    flex-direction: column;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 380px;
+    max-width: 90vw;
+    background: var(--surface);
+    border-radius: 0;
+    box-shadow: var(--shadow-lg);
+    z-index: 10001;
+    overflow: hidden;
+}
+
+.about-popup.open {
+    display: flex;
+}
+
+.about-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: #f1f5f9;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.about-popup-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.about-popup-body {
+    padding: 1rem 1.5rem;
+    line-height: 1.6;
+    text-align: center;
+}
+
+.about-popup-body p {
+    margin-bottom: 0;
+    font-size: 0.9rem;
+    color: var(--text);
+    white-space: normal;
+    word-break: break-word;
+}
+
+.about-popup-body .about-credits {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.about-popup-footer {
+    display: flex;
+    justify-content: center;
+    padding: 0.6rem 1rem;
+    background: #f8fafc;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
 }

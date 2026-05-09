@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Short Interest Tracker — Top 12</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260508_2330">
+    <title>Short Interest Tracker</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260509_0120">
 </head>
 <body>
     <div class="container">
@@ -33,20 +33,12 @@
         <!-- MIDDLE COLUMN: Short Interest Tracker -->
         <div class="middle-col">
         <header>
-            <h1><span class="header-icon">📉</span> Short Interest Tracker</h1>
-        </header>
-
-        <nav class="date-nav" id="dateNav">
-            <span class="nav-label">Date:</span>
-            <div class="date-buttons" id="dateButtons">
-                <!-- filled by JS -->
+            <div class="si-title-row">
+                <h1><span class="header-icon">📉</span> Short Interest Tracker</h1>
+                <span id="lastPoll"></span>
             </div>
-        </nav>
-
-        <div class="meta-row" id="metaRow">
-            <span id="currentDate">Loading…</span>
-            <span id="lastPoll"></span>
-        </div>
+        </header>
+        <div id="metaRow" style="display:none;"><span id="currentDate"></span></div>
 
         <table id="siTable">
             <thead>
@@ -82,10 +74,19 @@
             <button type="button" id="watchlistOpenBtn" class="lookup-btn">Edit Watchlist</button>
         </div>
         <div id="lookupError" class="error-message" style="display: none;"></div>
+        
+        <!-- Date navigation moved below SI table -->
+        <nav class="date-nav date-nav-below" id="dateNav">
+            <span class="nav-label">Date:</span>
+            <div class="date-buttons" id="dateButtons">
+                <!-- filled by JS -->
+            </div>
+        </nav>
         </div><!-- end middle-col -->
 
         <!-- RIGHT COLUMN: Gap table -->
-        <div class="right-col">
+        <div class="right-col" style="position:relative;">
+        <a href="#" class="about-link about-link-abs" id="aboutLink">About</a>
         <div class="gap-section gap-section-right">
             <div class="gap-subtitle">
                 <span>Pre-Mkt Gap Gainers &amp; Losers (Mkt Cap 10B–200B)</span>
@@ -109,6 +110,20 @@
         </div><!-- end right-col -->
 
         </div><!-- end page-layout -->
+    </div>
+
+    <!-- About Popup -->
+    <div class="about-popup" id="aboutPopup">
+        <div class="about-popup-header">
+            <h3>About Short Interest Tracker</h3>
+            <button class="close-btn" id="closeAbout">&times;</button>
+        </div>
+        <div class="about-popup-body">
+            <p>Made with Openclaw, finviz, yahoo/yfinance, Deepseek, Haiku, Sonnet, Opus, Brave.</p>
+        </div>
+        <div class="about-popup-footer">
+            <button type="button" class="watchlist-ok-btn" id="aboutOkBtn">OK</button>
+        </div>
     </div>
 
     <!-- Trade Plan Popup with Chart -->
@@ -162,12 +177,12 @@
 
         // ── Load dates ──
         async function loadDates() {
-            const resp = await fetch('/api/dates');
+            const resp = await fetch('/api/dates', {credentials: 'include'});
             const dates = await resp.json();
             const container = document.getElementById('dateButtons');
             container.innerHTML = '';
 
-            dates.slice(0, 5).forEach((d, i) => {
+            dates.slice(0, 7).forEach((d, i) => {
                 const btn = document.createElement('button');
                 btn.className = 'date-btn' + (i === 0 ? ' active' : '');
                 btn.textContent = formatDateShort(d);
@@ -187,7 +202,7 @@
 
         // ── Load data for date ──
         async function loadData(date) {
-            const resp = await fetch(`/api/data/${date}`);
+            const resp = await fetch(`/api/data/${date}`, {credentials: 'include'});
             const data = await resp.json();
             renderTable(data, date);
             
@@ -200,7 +215,7 @@
         // ── Load gap data ──
         async function loadGapData(date) {
             try {
-                const resp = await fetch(`/api/gap-data/${date}`);
+                const resp = await fetch(`/api/gap-data/${date}`, {credentials: 'include'});
                 const gapData = await resp.json();
                 renderGapTables(gapData);
                 
@@ -275,7 +290,7 @@
         // ── Load intraday data ──
         async function loadIntradayData(date) {
             try {
-                const resp = await fetch(`/api/intraday/${date}`);
+                const resp = await fetch(`/api/intraday/${date}`, {credentials: 'include'});
                 const data = await resp.json();
                 renderIntradayTable(data);
                 if (data.poll_ts) {
@@ -327,7 +342,7 @@
         // ── Show gap trade plan ──
         async function showGapTradePlan(ticker, date) {
             try {
-                const resp = await fetch(`/api/gap-trade-plan/${ticker}/${date}`);
+                const resp = await fetch(`/api/gap-trade-plan/${ticker}/${date}`, {credentials: 'include'});
                 if (!resp.ok) {
                     throw new Error(`HTTP ${resp.status}`);
                 }
@@ -499,7 +514,7 @@
             tradePlanPopup.style.display = 'flex';
             popupOverlay.style.display = 'block';
             
-            fetch(`/api/trade-plan/${ticker}/${date}`)
+            fetch(`/api/trade-plan/${ticker}/${date}`, {credentials: 'include'})
                 .then(resp => {
                     if (!resp.ok) {
                         return resp.json().then(errData => {
@@ -635,7 +650,7 @@
             resetLookupBtn.style.display = 'inline-block';
             tableBody.innerHTML = '<tr><td colspan="6" class="loading">Fetching data for ' + ticker + '…</td></tr>';
             
-            fetch(`/api/custom-ticker/${ticker}/${date}`)
+            fetch(`/api/custom-ticker/${ticker}/${date}`, {credentials: 'include'})
                 .then(res => {
                     if (!res.ok) {
                         if (res.status === 404) {
@@ -770,7 +785,7 @@
 
         async function wlOpen() {
             try {
-                const resp = await fetch('/api/watchlist');
+                const resp = await fetch('/api/watchlist', {credentials: 'include'});
                 if (!resp.ok) throw new Error('Failed to load watchlist');
                 wlTickers = await resp.json();
             } catch(e) {
@@ -793,6 +808,7 @@
         async function wlSave() {
             try {
                 const resp = await fetch('/api/watchlist', {
+                    credentials: 'include',
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(wlTickers)
@@ -865,8 +881,35 @@
             wlClose();
         });
 
+        // ── About Popup ──
+        const aboutLink = document.getElementById('aboutLink');
+        const aboutPopup = document.getElementById('aboutPopup');
+        const closeAbout = document.getElementById('closeAbout');
+        const aboutOkBtn = document.getElementById('aboutOkBtn');
+
+        function showAbout() {
+            aboutPopup.style.display = 'flex';
+            document.getElementById('popupOverlay').style.display = 'block';
+        }
+
+        function hideAbout() {
+            aboutPopup.style.display = 'none';
+            document.getElementById('popupOverlay').style.display = 'none';
+        }
+
+        aboutLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            showAbout();
+        });
+        closeAbout.addEventListener('click', hideAbout);
+        aboutOkBtn.addEventListener('click', hideAbout);
+
         // Unified overlay click handler
         document.getElementById('popupOverlay').addEventListener('click', function() {
+            if (document.getElementById('aboutPopup').style.display === 'flex') {
+                hideAbout();
+                return;
+            }
             if (document.getElementById('watchlistPopup').classList.contains('open')) {
                 wlClose();
             } else if (document.getElementById('tradePlanPopup').style.display === 'flex') {
