@@ -4,13 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260509_0230">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260509_0235">
 </head>
 <body>
     <div class="container">
-        <div class="about-mobile-row">
-            <a href="#" class="about-link" id="aboutLink">About</a>
-        </div>
+
         <header>
             <h1><span class="header-icon">📉</span> Short Interest Tracker</h1>
         </header>
@@ -105,6 +103,9 @@
 
     </div>
 
+    <!-- About link at bottom -->
+    <div style="text-align:center; padding: 1rem 0 0.5rem;"><a href="#" class="about-link" id="aboutLink">About</a></div>
+
     <!-- About Popup -->
     <div class="about-popup" id="aboutPopup">
         <div class="about-popup-header">
@@ -170,7 +171,7 @@
             const container = document.getElementById('dateButtons');
             container.innerHTML = '';
 
-            dates.slice(0, 7).forEach((d, i) => {
+            dates.slice(0, 6).forEach((d, i) => {
                 const btn = document.createElement('button');
                 btn.className = 'date-btn' + (i === 0 ? ' active' : '');
                 btn.textContent = formatDateShort(d);
