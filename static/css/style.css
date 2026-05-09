@@ -36,7 +36,7 @@ body {
 
 .container {
     margin: 0;
-    padding: 1rem 8px;
+    padding: 1rem 16px;
     box-sizing: border-box;
     width: 100%;
     position: relative;
@@ -713,10 +713,25 @@ footer a:hover {
     thead th, tbody td { padding: 0.5rem 0.5rem; font-size: 0.85rem; }
     .mcap-col { display: none; }
     .trade-plan-link { font-size: 0.75rem; }
-    .trade-plan-popup { width: 95vw; height: 92vh; max-height: 92vh; }
+    /* Popup: inset positioning so it never overflows browser chrome */
+    .trade-plan-popup {
+        top: 3%;
+        left: 2%;
+        right: 2%;
+        bottom: 3%;
+        width: auto;
+        max-width: none;
+        height: auto;
+        max-height: none;
+        transform: none;
+    }
+    .trade-plan-content {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
     .trade-plan-layout { flex-direction: column; }
     .chart-pane { flex: 0 0 60%; border-right: none; border-bottom: 1px solid var(--border); }
-    .analysis-pane { flex: 0 0 40%; }
+    .analysis-pane { flex: 0 0 auto; overflow-y: visible; }
 }
 
 /* Mobile-only trading view link */

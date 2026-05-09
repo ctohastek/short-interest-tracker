@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260509_0120">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260509_0230">
 </head>
 <body>
     <div class="container">
@@ -77,7 +77,6 @@
         
         <!-- Date navigation moved below SI table -->
         <nav class="date-nav date-nav-below" id="dateNav">
-            <span class="nav-label">Date:</span>
             <div class="date-buttons" id="dateButtons">
                 <!-- filled by JS -->
             </div>
@@ -601,8 +600,10 @@
 
         // ── Date formatting ──
         function formatDateShort(d) {
-            const parts = d.split('-');
-            return `${parts[1]}/${parts[2]}`;
+            const dt = new Date(d + 'T12:00:00');
+            const mon = dt.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+            const day = String(dt.getDate()).padStart(2, '0');
+            return `${mon} ${day}`;
         }
 
         function formatDateLong(d) {

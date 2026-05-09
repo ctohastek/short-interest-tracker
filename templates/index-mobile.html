@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Short Interest Tracker</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260509_0120">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260509_0230">
 </head>
 <body>
     <div class="container">
@@ -57,7 +57,6 @@
         
         <!-- Date navigation moved below SI table -->
         <nav class="date-nav date-nav-below" id="dateNav">
-            <span class="nav-label">Date:</span>
             <div class="date-buttons" id="dateButtons">
                 <!-- filled by JS -->
             </div>
@@ -545,8 +544,10 @@
 
         // ── Date formatting ──
         function formatDateShort(d) {
-            const parts = d.split('-');
-            return `${parts[1]}/${parts[2]}`;
+            const dt = new Date(d + 'T12:00:00');
+            const mon = dt.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+            const day = String(dt.getDate()).padStart(2, '0');
+            return `${mon} ${day}`;
         }
 
         function formatDateLong(d) {
@@ -861,6 +862,59 @@
 
         // ── Init ──
         loadDates();
+
+        // ── Pinch-to-resize popup ──
+        (function() {
+            const popup = document.getElementById('tradePlanPopup');
+            let startDist = null, startW = null, startH = null,
+                startTop = null, startLeft = null;
+
+            function getRect() {
+                return popup.getBoundingClientRect();
+            }
+
+            popup.addEventListener('touchstart', function(e) {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    const t1 = e.touches[0], t2 = e.touches[1];
+                    startDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+                    const r = getRect();
+                    startW = r.width;
+                    startH = r.height;
+                    startTop = r.top;
+                    startLeft = r.left;
+                    // Switch from % inset to explicit px so we can scale freely
+                    popup.style.top    = startTop + 'px';
+                    popup.style.left   = startLeft + 'px';
+                    popup.style.right  = 'auto';
+                    popup.style.bottom = 'auto';
+                    popup.style.width  = startW + 'px';
+                    popup.style.height = startH + 'px';
+                }
+            }, { passive: false });
+
+            popup.addEventListener('touchmove', function(e) {
+                if (e.touches.length === 2 && startDist !== null) {
+                    e.preventDefault();
+                    const t1 = e.touches[0], t2 = e.touches[1];
+                    const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+                    const ratio = dist / startDist;
+                    const maxW = window.innerWidth  * 0.98;
+                    const maxH = window.innerHeight * 0.96;
+                    const newW = Math.min(Math.max(startW * ratio, 220), maxW);
+                    const newH = Math.min(Math.max(startH * ratio, 200), maxH);
+                    // Re-centre as size changes
+                    popup.style.width  = newW + 'px';
+                    popup.style.height = newH + 'px';
+                    popup.style.top    = Math.max(0, (window.innerHeight - newH) / 2) + 'px';
+                    popup.style.left   = Math.max(0, (window.innerWidth  - newW) / 2) + 'px';
+                }
+            }, { passive: false });
+
+            popup.addEventListener('touchend', function(e) {
+                if (e.touches.length < 2) { startDist = null; }
+            });
+        })();
     </script>
 </body>
 </html>
