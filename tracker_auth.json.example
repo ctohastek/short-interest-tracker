@@ -1,0 +1,4 @@
+{
+    "admin": "pbkdf2:<salt_hex>:<hash_hex>",
+    "traderjoe": "pbkdf2:<salt_hex>:<hash_hex>"
+}

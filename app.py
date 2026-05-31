@@ -1032,7 +1032,18 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching of static files
 AUTH_CFG = CONFIG.get("auth", {})
 AUTH_ENABLED = AUTH_CFG.get("enabled", False)
 AUTH_REALM = AUTH_CFG.get("realm", "Login Required")
-AUTH_USERS = AUTH_CFG.get("users", {})
+
+_users_file = AUTH_CFG.get("users_file")
+if _users_file:
+    _upath = os.path.join(BASE_DIR, _users_file)
+    with open(_upath, "r") as _uf:
+        AUTH_USERS = json.load(_uf)
+elif AUTH_ENABLED:
+    raise RuntimeError(
+        f"auth.enabled is true but no users_file configured in {CONFIG_PATH}"
+    )
+else:
+    AUTH_USERS = {}
 
 
 def verify_pbkdf2(password, stored):

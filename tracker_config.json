@@ -11,10 +11,7 @@
     "auth": {
         "enabled": true,
         "realm": "Short Interest Tracker",
-        "users": {
-            "admin": "changeme",
-            "traderjoe": "spy0DTE"
-        }
+        "users_file": "tracker_auth.json"
     },
     "poll_schedule": {
         "hours": [10, 15],

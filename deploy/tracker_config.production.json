@@ -11,11 +11,7 @@
     "auth": {
         "enabled": true,
         "realm": "Short Interest Tracker",
-        "users": {
-            "traderjoe": "pbkdf2:512b253bc4596a8d610073d53d1dbc4d:bc996e83a3b9bd20c6b7369bd9d554e00c801b4d2d13a63f14ef33690a1909e0"
-                "admin": "pbkdf2:512b253bc4596a8d610073d53d1dbc4d:bc996e83a3b9bd20c6b7369bd9d554e00c801b4d2d13a63f14ef33690a1909e0"
-
-        }
+        "users_file": "tracker_auth.json"
     },
     "poll_schedule": {
         "hours": [10, 15],
