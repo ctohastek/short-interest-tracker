@@ -174,6 +174,13 @@
         let currentViewDate = null;
         let currentTradePlanTicker = null;
 
+        // ── HTML escape — prevents XSS when inserting API data into innerHTML ──
+        function esc(str) {
+            const d = document.createElement('div');
+            d.textContent = String(str ?? '');
+            return d.innerHTML;
+        }
+
         // ── Load dates ──
         async function loadDates() {
             const resp = await fetch('/api/dates', {credentials: 'include'});
@@ -260,7 +267,7 @@
             tr.style.cursor = 'pointer';
             tr.innerHTML = `
                 <td class="rank-col"></td>
-                <td class="ticker-col"><strong>${item.ticker}</strong></td>
+                <td class="ticker-col"><strong>${esc(item.ticker)}</strong></td>
                 <td class="pct-col ${pctClass}" style="font-weight:400">${pctDisplay}</td>
                 <td class="dollar-col ${dollarClass}">${dollarDisplay}</td>
                 <td class="price-col">${priceDisplay}</td>
@@ -314,7 +321,7 @@
             const tr = document.createElement('tr');
             tr.style.cursor = 'pointer';
             tr.innerHTML = `
-                <td class="intraday-ticker-cell"><strong>${item.ticker}</strong></td>
+                <td class="intraday-ticker-cell"><strong>${esc(item.ticker)}</strong></td>
                 <td class="intraday-pct-cell ${pctClass}">${pctDisplay}</td>
                 <td class="intraday-dollar-cell ${dollarClass}">${dollarDisplay}</td>
             `;
@@ -360,14 +367,14 @@
                 analysisPane.innerHTML = `
                     <div class="trade-plan-details">
                         <div class="plan-header">
-                            <h4>${plan.direction.toUpperCase()} - ${plan.sentiment.toUpperCase()}</h4>
-                            <p class="gap-desc">${plan.gap_description}</p>
+                            <h4>${esc(plan.direction.toUpperCase())} - ${esc(plan.sentiment.toUpperCase())}</h4>
+                            <p class="gap-desc">${esc(plan.gap_description)}</p>
                         </div>
-                        
+
                         <div class="plan-section">
                             <h5>Analysis</h5>
-                            <p>${plan.analysis}</p>
-                            <p><strong>IV Note:</strong> ${plan.iv_analysis}</p>
+                            <p>${esc(plan.analysis)}</p>
+                            <p><strong>IV Note:</strong> ${esc(plan.iv_analysis)}</p>
                         </div>
                         
                         <div class="plan-section">
@@ -461,9 +468,9 @@
 
                 tr.innerHTML = `
                     <td class="rank-col">${i + 1}</td>
-                    <td class="ticker-col"><strong>${row.ticker}</strong></td>
+                    <td class="ticker-col"><strong>${esc(row.ticker)}</strong></td>
                     <td class="pct-col ${pctClass}">${row.short_pct.toFixed(2)}%</td>
-                    <td class="dollar-col">${row.short_dollar}</td>
+                    <td class="dollar-col">${esc(row.short_dollar)}</td>
                     <td class="pc-col ${pcClass}">${pcDisplay}</td>
                     <td class="iv-col ${ivClass}">${ivDisplay}</td>
                 `;
@@ -529,7 +536,7 @@
                     renderTradePlan(data);
                 })
                 .catch(err => {
-                    analysisPane.innerHTML = `<div class="error">Failed to load trade plan: ${err.message}</div>`;
+                    analysisPane.innerHTML = `<div class="error">Failed to load trade plan: ${esc(err.message)}</div>`;
                 });
         }
 
@@ -543,8 +550,8 @@
         function renderTradePlan(data) {
             const { ticker, date, analysis } = data;
             
-            let overview = analysis.overview || 'No overview available.';
-            overview = overview.replace(/(shows\s+)(\d+\.?\d*%)(\s+short interest)/i, 
+            let overview = esc(analysis.overview || 'No overview available.');
+            overview = overview.replace(/(shows\s+)(\d+\.?\d*%)(\s+short interest)/i,
                 '$1<strong>$2</strong>$3');
             
             let html = `
@@ -591,7 +598,7 @@
                 </div>
                 <div class="trade-plan-section">
                     <h4>Notes</h4>
-                    <p>${analysis.notes || 'Monitor price action around key levels. Adjust stop loss as price moves in your favor.'}</p>
+                    <p>${esc(analysis.notes || 'Monitor price action around key levels. Adjust stop loss as price moves in your favor.')}</p>
                 </div>
             `;
             
@@ -678,7 +685,7 @@
         
         function renderSingleTicker(row, date, ticker) {
             dateNav.style.display = 'none';
-            metaRow.innerHTML = `<span>Single ticker: <strong>${ticker}</strong> • Date: ${formatDateLong(date)}</span>`;
+            metaRow.innerHTML = `<span>Single ticker: <strong>${esc(ticker)}</strong> • Date: ${formatDateLong(date)}</span>`;
             
             const tr = document.createElement('tr');
             tr.className = 'data-row';
@@ -699,9 +706,9 @@
             
             tr.innerHTML = `
                 <td class="rank-col">1</td>
-                <td class="ticker-col"><strong>${ticker}</strong></td>
+                <td class="ticker-col"><strong>${esc(ticker)}</strong></td>
                 <td class="pct-col ${pctClass}">${row.short_pct.toFixed(2)}%</td>
-                <td class="dollar-col">${row.short_dollar}</td>
+                <td class="dollar-col">${esc(row.short_dollar)}</td>
                 <td class="pc-col ${pcClass}">${pcDisplay}</td>
                 <td class="iv-col ${ivClass}">${ivDisplay}</td>
             `;

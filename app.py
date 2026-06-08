@@ -10,8 +10,10 @@ import sys
 import json
 import time
 import hashlib
+import hmac
 import sqlite3
 import logging
+import threading
 import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -1053,19 +1055,31 @@ def verify_pbkdf2(password, stored):
         salt = bytes.fromhex(salt_hex)
         expected = bytes.fromhex(hash_hex)
         dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 600_000)
-        return dk == expected
+        return hmac.compare_digest(dk, expected)
     except Exception:
         return False
+
+
+# Dummy values used when username doesn't exist — equalizes response time
+# so an attacker cannot enumerate valid usernames via timing differences.
+_DUMMY_SALT = bytes(16)
+_DUMMY_HASH = hashlib.pbkdf2_hmac("sha256", b"dummy", _DUMMY_SALT, 600_000)
 
 
 def check_auth(username, password):
     """Verify username/password against config. Supports plaintext or pbkdf2 hashes."""
     stored = AUTH_USERS.get(username)
     if stored is None:
+        # Always run a full PBKDF2 round so unknown usernames take the same
+        # time as valid ones, preventing username enumeration via timing.
+        hmac.compare_digest(
+            hashlib.pbkdf2_hmac("sha256", password.encode(), _DUMMY_SALT, 600_000),
+            _DUMMY_HASH,
+        )
         return False
     if stored.startswith("pbkdf2:"):
         return verify_pbkdf2(password, stored)
-    return stored == password
+    return hmac.compare_digest(stored, password)
 
 
 def auth_required(f):
@@ -1121,6 +1135,31 @@ def is_mobile():
     return False
 
 
+# ── Input validation helpers ─────────────────────────────────────────────
+
+_TICKER_RE = re.compile(r'^[A-Z]{1,5}$')
+_DATE_RE   = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+
+
+def _valid_ticker(ticker):
+    """Return (normalized_ticker, None) or (None, error_response)."""
+    t = ticker.strip().upper()
+    if not _TICKER_RE.match(t):
+        return None, (jsonify({"error": "Invalid ticker"}), 400)
+    return t, None
+
+
+def _valid_date(date):
+    """Return (date_str, None) or (None, error_response) if format/value is invalid."""
+    if not _DATE_RE.match(date):
+        return None, (jsonify({"error": "Invalid date"}), 400)
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        return None, (jsonify({"error": "Invalid date"}), 400)
+    return date, None
+
+
 @app.route("/")
 def index():
     """Serve mobile or desktop version based on detection."""
@@ -1159,16 +1198,18 @@ def api_dates():
 @app.route("/api/data/<date>")
 def api_data(date):
     """Return top short interest records for a given date."""
+    date, err = _valid_date(date)
+    if err: return err
     limit = 8 if is_mobile() else 12
     conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute(f"""
+    rows = conn.execute("""
         SELECT ticker, short_pct, short_dollar, market_cap, price, poll_ts,
                put_call_ratio, implied_volatility, COALESCE(sector, '') as sector
         FROM short_interest
         WHERE poll_date = ?
         ORDER BY short_pct DESC
-        LIMIT {limit}
-    """, (date,)).fetchall()
+        LIMIT ?
+    """, (date, limit)).fetchall()
     conn.close()
 
     data = []
@@ -1199,14 +1240,14 @@ def api_latest():
         return jsonify([])
     date = row[0]
     limit = 8 if is_mobile() else 12
-    rows = conn.execute(f"""
+    rows = conn.execute("""
         SELECT ticker, short_pct, short_dollar, market_cap, price, poll_ts,
                put_call_ratio, implied_volatility, COALESCE(sector, '') as sector
         FROM short_interest
         WHERE poll_date = ?
         ORDER BY short_pct DESC
-        LIMIT {limit}
-    """, (date,)).fetchall()
+        LIMIT ?
+    """, (date, limit)).fetchall()
     conn.close()
 
     data = []
@@ -1228,6 +1269,10 @@ def api_latest():
 @app.route("/api/chart/<ticker>/<date>")
 def api_chart(ticker, date):
     """Serve a saved chart image, or return 404 if none exists."""
+    ticker, err = _valid_ticker(ticker)
+    if err: return err
+    date, err = _valid_date(date)
+    if err: return err
     fname = f"{ticker}_{date}.png"
     fpath = os.path.join(CHART_DIR, fname)
     if os.path.exists(fpath):
@@ -1237,6 +1282,10 @@ def api_chart(ticker, date):
 @app.route("/api/trade-plan/<ticker>/<date>")
 def api_trade_plan(ticker, date):
     """Generate a trade plan with technical analysis for a ticker."""
+    ticker, err = _valid_ticker(ticker)
+    if err: return err
+    date, err = _valid_date(date)
+    if err: return err
     # Try to get data from database first
     conn = sqlite3.connect(DB_PATH)
     row = conn.execute("""
@@ -1281,7 +1330,10 @@ def api_trade_plan(ticker, date):
 @app.route("/api/custom-ticker/<ticker>/<date>")
 def api_custom_ticker(ticker, date):
     """Fetch data for a custom ticker (not in watchlist)."""
-    # Fetch data using same function as regular polling
+    ticker, err = _valid_ticker(ticker)
+    if err: return err
+    date, err = _valid_date(date)
+    if err: return err
     data = fetch_ticker_data(ticker)
     if not data:
         return jsonify({"error": f"No data found for {ticker}"}), 404
@@ -1298,11 +1350,27 @@ def api_custom_ticker(ticker, date):
     })
 
 
+_POLL_COOLDOWN    = 300          # minimum seconds between manual polls
+_poll_lock        = threading.Lock()
+_last_manual_poll: float = 0.0
+
+
 @app.route("/api/poll", methods=["POST"])
 def api_poll():
-    """Trigger a manual data poll."""
-    poll_all_tickers()
-    return jsonify({"status": "ok"})
+    """Trigger a manual data poll. One at a time, 5-minute cooldown."""
+    global _last_manual_poll
+    now = time.time()
+    if now - _last_manual_poll < _POLL_COOLDOWN:
+        wait = int(_POLL_COOLDOWN - (now - _last_manual_poll))
+        return jsonify({"error": f"Poll cooldown — retry in {wait}s"}), 429
+    if not _poll_lock.acquire(blocking=False):
+        return jsonify({"error": "Poll already in progress"}), 409
+    try:
+        _last_manual_poll = now
+        poll_all_tickers()
+        return jsonify({"status": "ok"})
+    finally:
+        _poll_lock.release()
 
 
 @app.route("/api/watchlist", methods=["GET"])
@@ -1353,8 +1421,10 @@ def api_watchlist_save():
 @app.route("/api/gap-data/<date>")
 def api_gap_data(date):
     """Return gap gainers and losers for a given date."""
+    date, err = _valid_date(date)
+    if err: return err
     conn = sqlite3.connect(DB_PATH)
-    
+
     # Get gap gainers
     gainers_rows = conn.execute("""
         SELECT ticker, pct_change, dollar_change, price, implied_volatility, 
@@ -1435,8 +1505,12 @@ def api_gap_data(date):
 @app.route("/api/gap-trade-plan/<ticker>/<date>")
 def api_gap_trade_plan(ticker, date):
     """Generate a trade plan for a gap stock."""
+    ticker, err = _valid_ticker(ticker)
+    if err: return err
+    date, err = _valid_date(date)
+    if err: return err
     conn = sqlite3.connect(DB_PATH)
-    
+
     # Try to find in gap gainers first
     row = conn.execute("""
         SELECT ticker, pct_change, dollar_change, price, implied_volatility, 
@@ -1544,6 +1618,8 @@ def api_gap_trade_plan(ticker, date):
 @app.route("/api/intraday/<date>")
 def api_intraday_data(date):
     """Return intraday movers for a given date (latest poll slot)."""
+    date, err = _valid_date(date)
+    if err: return err
     conn = sqlite3.connect(DB_PATH)
     # Get the most recent slot for this date
     slot_row = conn.execute(
@@ -1594,6 +1670,10 @@ def api_intraday_data(date):
 @app.route("/api/intraday-trade-plan/<ticker>/<date>")
 def api_intraday_trade_plan(ticker, date):
     """Generate a trade plan for an intraday mover."""
+    ticker, err = _valid_ticker(ticker)
+    if err: return err
+    date, err = _valid_date(date)
+    if err: return err
     conn = sqlite3.connect(DB_PATH)
     slot_row = conn.execute(
         "SELECT poll_slot FROM intraday_movers WHERE poll_date = ? ORDER BY poll_ts DESC LIMIT 1",
@@ -1713,7 +1793,6 @@ def start_scheduler():
 
     if existing == 0:
         log.info("No data for today — scheduling initial poll in background...")
-        import threading
         threading.Thread(target=poll_all_tickers, daemon=True).start()
     else:
         log.info(f"Already have {existing} records for {today}")
