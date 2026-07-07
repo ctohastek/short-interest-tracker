@@ -22,5 +22,9 @@
         "minute": 35,
         "days": "mon-fri"
     },
-    "keep_days": 10
+    "keep_days": 10,
+    "dev": {
+        "templates_auto_reload": true,
+        "disable_static_cache": true
+    }
 }

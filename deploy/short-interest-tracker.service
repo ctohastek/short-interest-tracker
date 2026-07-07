@@ -12,6 +12,24 @@ ExecStart=/usr/bin/gunicorn --config gunicorn_conf.py app:app
 Restart=on-failure
 RestartSec=10
 
+# ── Systemd hardening ──
+# Prevent the process from gaining new privileges via setuid/setgid
+NoNewPrivileges=yes
+# Give the process a private /tmp (isolated from other services)
+PrivateTmp=yes
+# Make /usr, /boot, /etc read-only; home dirs read-only
+ProtectSystem=full
+ProtectHome=read-only
+# Grant write access only to what the app actually needs
+# Adjust these paths to match your actual deployment directory
+ReadWritePaths=/path/to/short-interest-tracker/data /path/to/short-interest-tracker/static/charts /path/to/short-interest-tracker/watchlist.json
+# Lock the process's personality (prevents ABI tricks)
+LockPersonality=yes
+# Prevent real-time scheduling (not needed for a web app)
+RestrictRealtime=yes
+# Drop all capabilities — gunicorn doesn't need any
+CapabilityBoundingSet=
+
 [Install]
 WantedBy=multi-user.target
 

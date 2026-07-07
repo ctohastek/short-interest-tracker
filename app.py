@@ -11,6 +11,7 @@ import json
 import time
 import hashlib
 import hmac
+import fcntl
 import sqlite3
 import logging
 import threading
@@ -339,21 +340,15 @@ def fetch_ticker_data(ticker):
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # Collect label→value pairs from the snapshot table
+        # Collect label→value pairs from all snapshot tables (Finviz redesigned —
+        # data is now spread across multiple snapshot-table2 tables; scanning only
+        # the first table misses Short Float, Price, P/C and other fields)
         data = {}
         FIELDS = ("Short Float", "Short Interest", "Shs Float",
                   "Market Cap", "Price", "Shs Outstand", "P/C", "Volatility")
-        table = soup.find("table", class_="snapshot-table2")
-        if not table:
-            tables = soup.find_all("table")
-            for t in tables:
-                cells = t.find_all("td")
-                for i, cell in enumerate(cells):
-                    text = cell.get_text(strip=True)
-                    if text in FIELDS and i + 1 < len(cells):
-                        data[text] = cells[i + 1].get_text(strip=True)
-        else:
-            cells = table.find_all("td")
+        tables = soup.find_all("table")
+        for t in tables:
+            cells = t.find_all("td")
             for i, cell in enumerate(cells):
                 text = cell.get_text(strip=True)
                 if text in FIELDS and i + 1 < len(cells):
@@ -1027,8 +1022,10 @@ def generate_trade_analysis(ticker, current_price, short_pct, put_call_ratio):
 # ── Flask App ───────────────────────────────────────────────────────────
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.config['TEMPLATES_AUTO_RELOAD'] = True  # Auto-reload templates
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching of static files
+_dev_cfg = CONFIG.get("dev", {})
+app.config['TEMPLATES_AUTO_RELOAD'] = _dev_cfg.get("templates_auto_reload", False)
+if _dev_cfg.get("disable_static_cache", False):
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 # ── HTTP Basic Auth ─────────────────────────────────────────────────────
 AUTH_CFG = CONFIG.get("auth", {})
@@ -1407,7 +1404,9 @@ def api_watchlist_save():
                     break
         clean.sort()
         with open(_watchlist_path, "w") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
             json.dump(clean, f, indent=2)
+            # Lock released automatically on file close
         # Reload in-memory ticker list
         global TICKERS
         TICKERS = clean
@@ -1415,7 +1414,7 @@ def api_watchlist_save():
         return jsonify({"status": "ok", "count": len(clean)})
     except Exception as e:
         log.error(f"Error saving watchlist: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route("/api/gap-data/<date>")
